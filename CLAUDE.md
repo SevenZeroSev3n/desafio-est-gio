@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Technical-interview challenge ("Desafio Técnico — Banco", Agilize internship). The full spec is `ESPECIFICACAO.pdf`. The task is to build a fullstack **Banco** app: an HTTP API backend plus a web frontend that consumes it. As of now the repo contains **only the spec, README, and submission template — no implementation yet.** The first real work is choosing a stack and scaffolding both halves.
+Technical-interview challenge ("Desafio Técnico — Banco", Agilize internship). The full spec is `ESPECIFICACAO.pdf`. A fullstack **Banco** app: an HTTP API backend plus a web frontend that consumes it.
+
+**Implemented stack:** backend = `backend/` TypeScript + Express + SQLite (`better-sqlite3`) + Zod; frontend = `frontend/` React + Vite + TypeScript + Tailwind. Two independent `package.json` (no monorepo tooling). Vite proxies `/api` → backend on port 3001.
 
 ## Hard constraints (failing any one = elimination)
 
@@ -37,8 +39,22 @@ Functionality (both halves run, communicate, obey the rules), code quality (clar
 
 ## Money handling
 
-Amounts are BRL with cents. Use integer cents or a decimal type, not binary floats, to avoid rounding errors in fee/limit checks.
+Amounts are BRL. **Money is stored and computed as integer cents** (DB columns are INTEGER cents; `money.ts` converts at the API boundary via `toCents`/`toReais`) — never binary floats, to avoid rounding errors in fee/limit checks.
+
+## Where things live
+
+- `backend/src/services/AccountService.ts` — all business logic (withdraw, transfer). Pure class, no Express. The shared `computeDebit()` helper applies R1/R2 once for both withdraw and the transfer source (avoids duplicating the `if checking / if savings` logic). Rule constants (`CHECKING_FEE_CENTS`, `CHECKING_OVERDRAFT_LIMIT_CENTS`) live at the top.
+- `backend/src/routes/accounts.ts` — HTTP routes; only validate (Zod) + call service + format. Note `/transfer` is registered before `/:id` to avoid route collision.
+- `backend/src/db/{database,seed}.ts` — schema created idempotently on import; `seedIfEmpty()` (called from `server.ts`) inserts 3 sample accounts. `bank.db` is git-ignored and auto-created.
+- Business errors throw `AppError` (code + HTTP status); the central handler in `app.ts` maps `AppError`/`ZodError` to JSON. Business-rule violations → HTTP 422.
+- `frontend/src/api/bankApi.ts` — typed HTTP client; throws `ApiRequestError` carrying the backend's message/code.
 
 ## Build/run commands
 
-None yet — no stack chosen. Once the backend and frontend are scaffolded, document their real start commands here and mirror them into `README.md` (`SUBMISSION.md` is the template for what the README must contain).
+Each part has its own `package.json`; run `npm install` in each.
+
+- Backend (port 3001): `cd backend && npm run dev` (tsx watch). Prod: `npm run build` (tsc → `dist/`) then `npm start`. Typecheck: `npx tsc --noEmit`.
+- Frontend (port 5173): `cd frontend && npm run dev` (Vite). `npm run build` typechecks then bundles.
+- No test suite yet — verify rules with curl against the running API (see `README.md` examples) or add tests if extending.
+
+Keep `README.md` run steps in sync with these (eliminatory criterion).
