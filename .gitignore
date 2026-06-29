@@ -16,6 +16,11 @@ build/
 *.jar
 *.exe
 
+# Banco de dados local (gerado/seedado em runtime)
+*.db
+*.db-wal
+*.db-shm
+
 # IDE / OS
 .idea/
 .vscode/
