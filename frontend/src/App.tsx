@@ -5,6 +5,7 @@ import { AccountCard } from "./components/AccountCard";
 import { WithdrawPanel } from "./components/WithdrawPanel";
 import { TransferPanel } from "./components/TransferPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
+import { NewAccountModal } from "./components/NewAccountModal";
 import type { Account } from "./types";
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
   const [activeAccountId, setActiveAccountId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showNewAccount, setShowNewAccount] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -39,6 +41,12 @@ export default function App() {
     window.setTimeout(() => setToast(null), 6000);
   }
 
+  function handleCreated(account: Account) {
+    setShowNewAccount(false);
+    setActiveAccountId(account.id); // auto-ativa a conta recém-criada
+    handleDone(`Conta "${account.name}" criada.`);
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <header className="mb-8">
@@ -58,15 +66,23 @@ export default function App() {
         </div>
       )}
 
-      {accounts.length > 0 && (
-        <section className="mb-6">
+      <section className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        {accounts.length > 0 ? (
           <AccountSelector
             accounts={accounts}
             activeAccountId={activeAccountId}
             onSelect={setActiveAccountId}
           />
-        </section>
-      )}
+        ) : (
+          <span className="text-sm text-slate-500">Nenhuma conta cadastrada.</span>
+        )}
+        <button
+          onClick={() => setShowNewAccount(true)}
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+        >
+          + Nova conta
+        </button>
+      </section>
 
       {activeAccount ? (
         <>
@@ -88,8 +104,12 @@ export default function App() {
         </>
       ) : (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-500">
-          Nenhuma conta ainda.
+          Nenhuma conta ainda. Use "+ Nova conta" para criar a primeira.
         </p>
+      )}
+
+      {showNewAccount && (
+        <NewAccountModal onClose={() => setShowNewAccount(false)} onCreated={handleCreated} />
       )}
     </div>
   );
