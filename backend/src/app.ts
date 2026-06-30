@@ -6,6 +6,7 @@ import { AppError } from "./errors";
 import { AccountService } from "./services/AccountService";
 import { createAccountsRouter } from "./routes/accounts";
 import { createTitularesRouter } from "./routes/titulares";
+import { createManagerRouter } from "./routes/manager";
 
 export function createApp(db: Database.Database) {
   const app = express();
@@ -17,6 +18,7 @@ export function createApp(db: Database.Database) {
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
   app.use("/api/v1/accounts", createAccountsRouter(service));
   app.use("/api/v1/titulares", createTitularesRouter(service));
+  app.use("/api/v1/manager", createManagerRouter(service));
 
   // 404 para rotas desconhecidas
   app.use((_req, res) => {

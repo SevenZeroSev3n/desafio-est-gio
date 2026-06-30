@@ -210,6 +210,45 @@ describe("tarifa é creditada na conta do gerente", () => {
   });
 });
 
+describe("carteira do gerente (leitura)", () => {
+  it("getManagerWallet devolve o saldo acumulado de tarifas", () => {
+    const { service, ids } = setup([
+      { name: "Cliente", type: "checking", balance: 1000 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    service.withdraw(ids[0], 100);
+    expect(service.getManagerWallet().balance).toBe(1); // R$ 1,00
+    expect(service.getManagerWallet().type).toBe("manager");
+  });
+
+  it("getManagerWallet dá 404 quando não há conta de gerente", () => {
+    const { service } = setup([{ name: "Cliente", type: "checking", balance: 100 }]);
+    expect(codeOfThrow(() => service.getManagerWallet())).toBe("MANAGER_NOT_FOUND");
+  });
+
+  it("managerHistory devolve as tarifas creditadas", () => {
+    const { service, ids } = setup([
+      { name: "Cliente", type: "checking", balance: 1000 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    service.withdraw(ids[0], 100);
+    const hist = service.managerHistory();
+    expect(hist).toHaveLength(1);
+    expect(hist[0].type).toBe("transfer_in");
+    expect(hist[0].amount).toBe(1);
+  });
+
+  it("listTitulares esconde o titular do gerente", () => {
+    const { service } = setup([
+      { name: "João", type: "checking", balance: 100 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    const nomes = service.listTitulares().map((t) => t.nome);
+    expect(nomes).toContain("João");
+    expect(nomes).not.toContain("Gerente");
+  });
+});
+
 describe("aritmética em centavos (sem drift de float)", () => {
   it("0.30 − 0.10 − 0.20 = 0 exato", () => {
     const { service, db, ids } = setup([{ name: "A", type: "savings", balance: 0.3 }]);

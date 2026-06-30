@@ -49,7 +49,24 @@ export class AccountService {
   }
 
   listTitulares(): Titular[] {
-    return this.db.prepare("SELECT id, nome FROM titulares ORDER BY id").all() as Titular[];
+    // O titular dono da conta interna do gerente não é um cliente: fica de fora.
+    return this.db
+      .prepare(
+        `SELECT id, nome FROM titulares
+         WHERE id NOT IN (SELECT owner_id FROM accounts WHERE type = 'manager')
+         ORDER BY id`,
+      )
+      .all() as Titular[];
+  }
+
+  /** Carteira interna do gerente: a conta que acumula as tarifas das correntes. */
+  getManagerWallet(): AccountDTO {
+    return toDTO(this.requireManager());
+  }
+
+  /** Extrato da carteira do gerente — as tarifas creditadas, mais recentes primeiro. */
+  managerHistory() {
+    return this.history(this.requireManager().id);
   }
 
   getAccount(id: number): AccountDTO {
@@ -169,6 +186,12 @@ export class AccountService {
   private requireAccount(id: number): AccountRow {
     const row = this.db.prepare(`${SELECT_ACCOUNT} WHERE a.id = ?`).get(id) as AccountRow | undefined;
     if (!row) throw new AppError("Conta não encontrada", "ACCOUNT_NOT_FOUND", 404);
+    return row;
+  }
+
+  private requireManager(): AccountRow {
+    const row = this.db.prepare(`${SELECT_ACCOUNT} WHERE a.type = 'manager'`).get() as AccountRow | undefined;
+    if (!row) throw new AppError("Conta do gerente não encontrada", "MANAGER_NOT_FOUND", 404);
     return row;
   }
 
