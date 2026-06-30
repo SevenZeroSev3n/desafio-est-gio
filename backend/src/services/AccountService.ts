@@ -2,27 +2,43 @@ import { randomUUID } from "crypto";
 import type Database from "better-sqlite3";
 import { AppError } from "../errors";
 import { toCents, toReais } from "../money";
-import type { Account, AccountType, Transaction } from "../types";
+import type { Account, AccountType, Titular, Transaction } from "../types";
 import { policyFor } from "./accountPolicy";
 
-/** Conta como exposta na API: saldo em reais. */
+/** Conta como exposta na API: saldo em reais, com o titular dono aninhado. */
 export interface AccountDTO {
   id: number;
-  name: string;
   type: AccountType;
   balance: number;
   created_at: string;
+  owner: { id: number; name: string };
 }
+
+/** Linha de conta já com o nome do titular (resultado do join). */
+interface AccountRow extends Account {
+  owner_name: string;
+}
+
+/** Referência ao titular na criação: um existente (id) ou um novo (name). */
+export type OwnerRef = { id: number } | { name: string };
+
+const SELECT_ACCOUNT = `
+  SELECT a.id, a.owner_id, a.type, a.balance, a.created_at, t.nome AS owner_name
+  FROM accounts a
+  JOIN titulares t ON t.id = a.owner_id
+`;
 
 export class AccountService {
   // O banco é injetado pela aplicação (singleton).
   constructor(private readonly db: Database.Database) {}
 
   listAccounts(): AccountDTO[] {
-    const rows = this.db
-      .prepare("SELECT * FROM accounts ORDER BY id")
-      .all() as Account[];
+    const rows = this.db.prepare(`${SELECT_ACCOUNT} ORDER BY a.id`).all() as AccountRow[];
     return rows.map(toDTO);
+  }
+
+  listTitulares(): Titular[] {
+    return this.db.prepare("SELECT id, nome FROM titulares ORDER BY id").all() as Titular[];
   }
 
   getAccount(id: number): AccountDTO {
@@ -30,17 +46,25 @@ export class AccountService {
   }
 
   /**
-   * Cria uma conta. Regra de negócio: o saldo inicial não pode ser negativo —
-   * o cheque especial da corrente só nasce de um saque, nunca da criação.
+   * Cria uma conta para um titular existente (`owner.id`) ou novo (`owner.name`).
+   * O titular novo e a conta nascem na mesma transação. Regra de negócio: o saldo
+   * inicial não pode ser negativo — o cheque especial da corrente só nasce de um saque.
    */
-  createAccount(name: string, type: AccountType, initialBalance: number): AccountDTO {
+  createAccount(type: AccountType, initialBalance: number, owner: OwnerRef): AccountDTO {
     if (initialBalance < 0) {
       throw new AppError("Saldo inicial não pode ser negativo", "NEGATIVE_INITIAL_BALANCE", 422);
     }
-    const info = this.db
-      .prepare("INSERT INTO accounts (name, type, balance) VALUES (?, ?, ?)")
-      .run(name, type, toCents(initialBalance));
-    return this.getAccount(Number(info.lastInsertRowid));
+
+    let accountId = 0;
+    this.db.transaction(() => {
+      const ownerId = "id" in owner ? this.requireTitular(owner.id) : this.createTitular(owner.name);
+      const info = this.db
+        .prepare("INSERT INTO accounts (owner_id, type, balance) VALUES (?, ?, ?)")
+        .run(ownerId, type, toCents(initialBalance));
+      accountId = Number(info.lastInsertRowid);
+    })();
+
+    return this.getAccount(accountId);
   }
 
   /** Saque: aplica as regras do tipo de conta (R1/R2) e registra a transação. */
@@ -129,10 +153,21 @@ export class AccountService {
     return newBalanceCents;
   }
 
-  private requireAccount(id: number): Account {
-    const account = this.db.prepare("SELECT * FROM accounts WHERE id = ?").get(id) as Account | undefined;
-    if (!account) throw new AppError("Conta não encontrada", "ACCOUNT_NOT_FOUND", 404);
-    return account;
+  private requireAccount(id: number): AccountRow {
+    const row = this.db.prepare(`${SELECT_ACCOUNT} WHERE a.id = ?`).get(id) as AccountRow | undefined;
+    if (!row) throw new AppError("Conta não encontrada", "ACCOUNT_NOT_FOUND", 404);
+    return row;
+  }
+
+  private requireTitular(id: number): number {
+    const row = this.db.prepare("SELECT id FROM titulares WHERE id = ?").get(id) as { id: number } | undefined;
+    if (!row) throw new AppError("Titular não encontrado", "OWNER_NOT_FOUND", 422);
+    return row.id;
+  }
+
+  private createTitular(nome: string): number {
+    const info = this.db.prepare("INSERT INTO titulares (nome) VALUES (?)").run(nome);
+    return Number(info.lastInsertRowid);
   }
 
   private setBalance(id: number, balanceCents: number): void {
@@ -154,12 +189,12 @@ export class AccountService {
   }
 }
 
-function toDTO(account: Account): AccountDTO {
+function toDTO(account: AccountRow): AccountDTO {
   return {
     id: account.id,
-    name: account.name,
     type: account.type,
     balance: toReais(account.balance),
     created_at: account.created_at,
+    owner: { id: account.owner_id, name: account.owner_name },
   };
 }

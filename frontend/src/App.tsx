@@ -6,10 +6,11 @@ import { WithdrawPanel } from "./components/WithdrawPanel";
 import { TransferPanel } from "./components/TransferPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { NewAccountModal } from "./components/NewAccountModal";
-import type { Account } from "./types";
+import type { Account, Titular } from "./types";
 
 export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [titulares, setTitulares] = useState<Titular[]>([]);
   const [activeAccountId, setActiveAccountId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -17,8 +18,9 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const list = await bankApi.listAccounts();
+      const [list, owners] = await Promise.all([bankApi.listAccounts(), bankApi.listTitulares()]);
       setAccounts(list);
+      setTitulares(owners);
       // Preserva a conta ativa por id; se ela sumiu (ou nao havia), cai na primeira.
       setActiveAccountId((prev) =>
         prev !== null && list.some((a) => a.id === prev) ? prev : list[0]?.id ?? null,
@@ -44,7 +46,7 @@ export default function App() {
   function handleCreated(account: Account) {
     setShowNewAccount(false);
     setActiveAccountId(account.id); // auto-ativa a conta recém-criada
-    handleDone(`Conta "${account.name}" criada.`);
+    handleDone(`Conta de ${account.owner.name} criada.`);
   }
 
   return (
@@ -109,7 +111,11 @@ export default function App() {
       )}
 
       {showNewAccount && (
-        <NewAccountModal onClose={() => setShowNewAccount(false)} onCreated={handleCreated} />
+        <NewAccountModal
+          titulares={titulares}
+          onClose={() => setShowNewAccount(false)}
+          onCreated={handleCreated}
+        />
       )}
     </div>
   );

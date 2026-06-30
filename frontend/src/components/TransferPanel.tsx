@@ -29,7 +29,7 @@ export function TransferPanel({ source, accounts, onDone }: Props) {
       const res = await bankApi.transfer(source.id, Number(toId), value);
       const feeNote = res.fee_charged > 0 ? ` (tarifa ${formatBRL(res.fee_charged)})` : "";
       onDone(
-        `Transferência de ${formatBRL(value)}${feeNote}. ${res.from.name}: ${formatBRL(res.from.balance)} · ${res.to.name}: ${formatBRL(res.to.balance)}.`,
+        `Transferência de ${formatBRL(value)}${feeNote}. ${res.from.owner.name}: ${formatBRL(res.from.balance)} · ${res.to.owner.name}: ${formatBRL(res.to.balance)}.`,
       );
       setAmount("");
       setToId("");
@@ -55,7 +55,7 @@ export function TransferPanel({ source, accounts, onDone }: Props) {
             <div>
               <span className="block text-sm font-medium text-slate-700">De</span>
               <p className="mt-1 rounded-lg bg-slate-50 px-2 py-2 text-sm text-slate-600">
-                {source.name} · {accountTypeLabel(source.type)}
+                {source.owner.name} · {accountTypeLabel(source.type)}
               </p>
             </div>
             <div>
@@ -68,7 +68,7 @@ export function TransferPanel({ source, accounts, onDone }: Props) {
                 <option value="">Selecione</option>
                 {destinations.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} ({formatBRL(a.balance)})
+                    {a.owner.name} — {accountTypeLabel(a.type)} ({formatBRL(a.balance)})
                   </option>
                 ))}
               </select>

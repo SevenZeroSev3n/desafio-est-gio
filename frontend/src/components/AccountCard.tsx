@@ -11,7 +11,7 @@ export function AccountCard({ account }: Props) {
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-semibold text-slate-900">{account.name}</h3>
+          <h3 className="font-semibold text-slate-900">{account.owner.name}</h3>
           <span
             className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
               account.type === "checking"

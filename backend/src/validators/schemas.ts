@@ -19,13 +19,26 @@ export const transferSchema = z.object({
   amount: money,
 });
 
-// Criação de conta: valida apenas o shape. A regra "saldo inicial >= 0" é de
-// negócio e fica no AccountService.
-export const createAccountSchema = z.object({
-  name: z.string().trim().min(1, "nome é obrigatório").max(100, "nome deve ter no máximo 100 caracteres"),
-  type: z.enum(["checking", "savings"]),
-  balance: z
-    .number({ invalid_type_error: "balance deve ser um número" })
-    .refine(hasAtMostTwoDecimals, { message: "balance deve ter no máximo 2 casas decimais" })
-    .default(0),
-});
+const ownerName = z
+  .string()
+  .trim()
+  .min(1, "nome é obrigatório")
+  .max(100, "nome deve ter no máximo 100 caracteres");
+
+// Criação de conta: valida apenas o shape. O dono vem como owner_id (titular
+// existente) OU owner_name (titular novo), exatamente um. A regra "saldo inicial
+// >= 0" e a existência do owner_id são de negócio e ficam no AccountService.
+export const createAccountSchema = z
+  .object({
+    type: z.enum(["checking", "savings"]),
+    balance: z
+      .number({ invalid_type_error: "balance deve ser um número" })
+      .refine(hasAtMostTwoDecimals, { message: "balance deve ter no máximo 2 casas decimais" })
+      .default(0),
+    owner_id: z.number().int().positive().optional(),
+    owner_name: ownerName.optional(),
+  })
+  .refine((d) => (d.owner_id !== undefined) !== (d.owner_name !== undefined), {
+    message: "informe owner_id ou owner_name (exatamente um)",
+    path: ["owner"],
+  });

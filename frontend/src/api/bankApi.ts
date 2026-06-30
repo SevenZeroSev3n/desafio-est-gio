@@ -1,4 +1,4 @@
-import type { Account, AccountType, ApiError, Transaction } from "../types";
+import type { Account, AccountType, ApiError, Titular, Transaction } from "../types";
 
 const BASE = "/api/v1";
 
@@ -26,10 +26,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const bankApi = {
   listAccounts: () => request<Account[]>("/accounts"),
 
-  createAccount: (name: string, type: AccountType, balance: number) =>
+  listTitulares: () => request<Titular[]>("/titulares"),
+
+  createAccount: (params: {
+    type: AccountType;
+    balance: number;
+    owner: { id: number } | { name: string };
+  }) =>
     request<Account>("/accounts", {
       method: "POST",
-      body: JSON.stringify({ name, type, balance }),
+      body: JSON.stringify({
+        type: params.type,
+        balance: params.balance,
+        ...("id" in params.owner
+          ? { owner_id: params.owner.id }
+          : { owner_name: params.owner.name }),
+      }),
     }),
 
   withdraw: (id: number, amount: number) =>

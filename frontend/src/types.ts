@@ -1,11 +1,16 @@
 export type AccountType = "checking" | "savings";
 
+export interface Titular {
+  id: number;
+  nome: string;
+}
+
 export interface Account {
   id: number;
-  name: string;
   type: AccountType;
   balance: number;
   created_at: string;
+  owner: { id: number; name: string };
 }
 
 export interface Transaction {

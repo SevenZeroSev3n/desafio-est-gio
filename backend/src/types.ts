@@ -1,9 +1,15 @@
 export type AccountType = "checking" | "savings";
 
+/** Titular (dono) de uma ou mais Contas. */
+export interface Titular {
+  id: number;
+  nome: string;
+}
+
 /** Conta como persistida. Saldo sempre em centavos (inteiro) para evitar erro de float. */
 export interface Account {
   id: number;
-  name: string;
+  owner_id: number;
   type: AccountType;
   balance: number; // centavos
   created_at: string;

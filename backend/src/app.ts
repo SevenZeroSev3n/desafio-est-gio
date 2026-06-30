@@ -3,6 +3,7 @@ import cors from "cors";
 import { ZodError } from "zod";
 import { AppError } from "./errors";
 import accountsRouter from "./routes/accounts";
+import titularesRouter from "./routes/titulares";
 
 export function createApp() {
   const app = express();
@@ -12,6 +13,7 @@ export function createApp() {
 
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
   app.use("/api/v1/accounts", accountsRouter);
+  app.use("/api/v1/titulares", titularesRouter);
 
   // 404 para rotas desconhecidas
   app.use((_req, res) => {

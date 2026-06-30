@@ -11,9 +11,21 @@ import type { AccountType } from "../types";
 function setup(accounts: Array<{ name: string; type: AccountType; balance: number }>) {
   const db = new Database(":memory:");
   applySchema(db);
-  const insert = db.prepare("INSERT INTO accounts (name, type, balance) VALUES (?, ?, ?)");
-  const ids = accounts.map((a) => Number(insert.run(a.name, a.type, toCents(a.balance)).lastInsertRowid));
+  const insTitular = db.prepare("INSERT INTO titulares (nome) VALUES (?)");
+  const insAccount = db.prepare("INSERT INTO accounts (owner_id, type, balance) VALUES (?, ?, ?)");
+  const ids = accounts.map((a) => {
+    const ownerId = Number(insTitular.run(a.name).lastInsertRowid);
+    return Number(insAccount.run(ownerId, a.type, toCents(a.balance)).lastInsertRowid);
+  });
   return { service: new AccountService(db), db, ids };
+}
+
+function countTitulares(db: Database.Database): number {
+  return (db.prepare("SELECT COUNT(*) AS c FROM titulares").get() as { c: number }).c;
+}
+
+function ownerOf(db: Database.Database, accountId: number): number {
+  return (db.prepare("SELECT owner_id FROM accounts WHERE id = ?").get(accountId) as { owner_id: number }).owner_id;
 }
 
 function balanceOf(db: Database.Database, id: number): number {
@@ -122,18 +134,19 @@ test("transferência para a mesma conta é rejeitada", () => {
 
 // --- criação de conta ---
 
-test("createAccount: cria corrente com saldo inicial e persiste em centavos", () => {
+test("createAccount: titular novo cria corrente e persiste em centavos", () => {
   const { service, db } = setup([]);
-  const acc = service.createAccount("Ana", "checking", 100.5);
-  assert.equal(acc.name, "Ana");
+  const acc = service.createAccount("checking", 100.5, { name: "Ana" });
+  assert.equal(acc.owner.name, "Ana");
   assert.equal(acc.type, "checking");
   assert.equal(acc.balance, 100.5);
   assert.equal(balanceOf(db, acc.id), toCents(100.5)); // 10050
+  assert.equal(countTitulares(db), 1);
 });
 
 test("createAccount: saldo inicial 0 cria poupança zerada", () => {
   const { service } = setup([]);
-  const acc = service.createAccount("Bia", "savings", 0);
+  const acc = service.createAccount("savings", 0, { name: "Bia" });
   assert.equal(acc.type, "savings");
   assert.equal(acc.balance, 0);
 });
@@ -141,14 +154,34 @@ test("createAccount: saldo inicial 0 cria poupança zerada", () => {
 test("createAccount: saldo inicial negativo é rejeitado (regra de negócio)", () => {
   const { service } = setup([]);
   assert.equal(
-    codeOfThrow(() => service.createAccount("Caio", "checking", -0.01)),
+    codeOfThrow(() => service.createAccount("checking", -0.01, { name: "Caio" })),
     "NEGATIVE_INITIAL_BALANCE",
   );
 });
 
 test("createAccount: saldo com 2 casas não sofre drift de float", () => {
   const { service, db } = setup([]);
-  const acc = service.createAccount("Dora", "savings", 99.99);
+  const acc = service.createAccount("savings", 99.99, { name: "Dora" });
   assert.equal(acc.balance, 99.99);
   assert.equal(balanceOf(db, acc.id), 9999);
+});
+
+test("createAccount: titular existente vincula a conta ao mesmo dono (sem criar outro)", () => {
+  const { service, db, ids } = setup([{ name: "João", type: "checking", balance: 1000 }]);
+  const ownerId = ownerOf(db, ids[0]);
+  const poupanca = service.createAccount("savings", 0, { id: ownerId });
+  assert.equal(poupanca.owner.id, ownerId);
+  assert.equal(poupanca.owner.name, "João");
+  assert.equal(countTitulares(db), 1); // reusou o titular, não criou um novo
+});
+
+test("createAccount: owner_id inexistente é rejeitado", () => {
+  const { service } = setup([]);
+  assert.equal(codeOfThrow(() => service.createAccount("checking", 0, { id: 999 })), "OWNER_NOT_FOUND");
+});
+
+test("createAccount: saldo negativo não cria titular órfão (atômico)", () => {
+  const { service, db } = setup([]);
+  assert.equal(codeOfThrow(() => service.createAccount("checking", -5, { name: "Novo" })), "NEGATIVE_INITIAL_BALANCE");
+  assert.equal(countTitulares(db), 0);
 });
