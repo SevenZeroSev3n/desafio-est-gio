@@ -41,6 +41,6 @@ Each part has its own `package.json`; run `npm install` in each.
 
 - Backend (port 3001): `cd backend && npm run dev` (tsx watch). Prod: `npm run build` (tsc → `dist/`) then `npm start`. Typecheck: `npx tsc --noEmit`.
 - Frontend (port 5173): `cd frontend && npm run dev` (Vite). `npm run build` typechecks then bundles.
-- No test suite yet — verify rules with curl against the running API (see `README.md` examples) or add tests if extending.
+- Tests (Vitest, both parts): `npm test` in `backend/` (AccountService + routes via `supertest`, SQLite `:memory:`) and `frontend/` (RTL smoke). CI (`.github/workflows/ci.yml`) runs both on every PR to `main`, matrix Node 18/20.
 
 Keep `README.md` run steps in sync with these (eliminatory criterion).
