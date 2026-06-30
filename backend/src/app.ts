@@ -1,19 +1,22 @@
 import express, { type ErrorRequestHandler } from "express";
 import cors from "cors";
+import type Database from "better-sqlite3";
 import { ZodError } from "zod";
 import { AppError } from "./errors";
-import accountsRouter from "./routes/accounts";
-import titularesRouter from "./routes/titulares";
+import { AccountService } from "./services/AccountService";
+import { createAccountsRouter } from "./routes/accounts";
+import { createTitularesRouter } from "./routes/titulares";
 
-export function createApp() {
+export function createApp(db: Database.Database) {
   const app = express();
+  const service = new AccountService(db);
 
   app.use(cors());
   app.use(express.json());
 
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
-  app.use("/api/v1/accounts", accountsRouter);
-  app.use("/api/v1/titulares", titularesRouter);
+  app.use("/api/v1/accounts", createAccountsRouter(service));
+  app.use("/api/v1/titulares", createTitularesRouter(service));
 
   // 404 para rotas desconhecidas
   app.use((_req, res) => {
