@@ -45,9 +45,24 @@ const savingsPolicy: AccountPolicy = {
   },
 };
 
+// Conta do gerente: acumula as tarifas das correntes. Não cobra tarifa de si
+// mesma e, como a poupança, nunca pode ficar negativa.
+const managerPolicy: AccountPolicy = {
+  feeCents: 0,
+  assertDebitAllowed({ account, amountCents, newBalanceCents }) {
+    if (newBalanceCents < 0) {
+      throw new AppError("Conta do gerente não pode ficar com saldo negativo", "MANAGER_NEGATIVE_BALANCE", 422, {
+        current_balance: toReais(account.balance),
+        requested: toReais(amountCents),
+      });
+    }
+  },
+};
+
 const POLICIES: Record<AccountType, AccountPolicy> = {
   checking: checkingPolicy,
   savings: savingsPolicy,
+  manager: managerPolicy,
 };
 
 /** Seleciona a policy do tipo. Um novo tipo de conta é uma entrada nova aqui, sem tocar no AccountService. */

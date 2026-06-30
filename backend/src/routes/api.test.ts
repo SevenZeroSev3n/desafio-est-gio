@@ -126,6 +126,27 @@ describe("POST /accounts", () => {
   });
 });
 
+describe("conta do gerente é invisível para o cliente", () => {
+  it("404 ao sacar da conta do gerente (indistinguível de inexistente)", async () => {
+    const { app, ids } = makeApp([{ name: "Gerente", type: "manager", balance: 5000 }]);
+    const res = await request(app).post(`/api/v1/accounts/${ids[0]}/withdraw`).send({ amount: 100 });
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("ACCOUNT_NOT_FOUND");
+  });
+
+  it("404 ao transferir para a conta do gerente", async () => {
+    const { app, ids } = makeApp([
+      { name: "Cliente", type: "checking", balance: 1000 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    const res = await request(app)
+      .post("/api/v1/accounts/transfer")
+      .send({ from_id: ids[0], to_id: ids[1], amount: 100 });
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("ACCOUNT_NOT_FOUND");
+  });
+});
+
 describe("GET /accounts/:id e /titulares", () => {
   it("404 para conta inexistente", async () => {
     const { app } = makeApp();
