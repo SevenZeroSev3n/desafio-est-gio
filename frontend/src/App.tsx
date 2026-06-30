@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { bankApi } from "./api/bankApi";
-import { AccountSelector } from "./components/AccountSelector";
-import { AccountCard } from "./components/AccountCard";
+import { Sidebar } from "./components/Sidebar";
+import { BalanceHero } from "./components/BalanceHero";
 import { WithdrawPanel } from "./components/WithdrawPanel";
 import { TransferPanel } from "./components/TransferPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { NewAccountModal } from "./components/NewAccountModal";
-import type { Account, Titular } from "./types";
+import { PixelField } from "./components/PixelField";
+import type { Account, Titular, Transaction } from "./types";
 
 export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [titulares, setTitulares] = useState<Titular[]>([]);
   const [activeAccountId, setActiveAccountId] = useState<number | null>(null);
+  const [txs, setTxs] = useState<Transaction[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showNewAccount, setShowNewAccount] = useState(false);
@@ -37,6 +39,25 @@ export default function App() {
 
   const activeAccount = accounts.find((a) => a.id === activeAccountId) ?? null;
 
+  // Histórico da conta ativa, levantado aqui para o herói (sparkline/totais) e o
+  // painel de histórico compartilharem um único fetch. Guard de corrida: trocar
+  // de conta rápido pode resolver respostas fora de ordem.
+  useEffect(() => {
+    if (activeAccountId === null) {
+      setTxs(null);
+      return;
+    }
+    let active = true;
+    setTxs(null);
+    bankApi
+      .history(activeAccountId)
+      .then((data) => active && setTxs(data))
+      .catch(() => active && setTxs([]));
+    return () => {
+      active = false;
+    };
+  }, [activeAccountId]);
+
   function handleDone(message: string) {
     setToast(message);
     refresh();
@@ -50,65 +71,66 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Banco 🏦</h1>
-        <p className="mt-1 text-slate-500">Saque e transferência sobre contas corrente e poupança.</p>
-      </header>
+    <div className="flex min-h-screen flex-col md:flex-row">
+      <PixelField />
 
-      {loadError && (
-        <div className="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {loadError}
-        </div>
-      )}
-
-      {toast && (
-        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {toast}
-        </div>
-      )}
-
-      <section className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        {accounts.length > 0 ? (
-          <AccountSelector
-            accounts={accounts}
-            activeAccountId={activeAccountId}
-            onSelect={setActiveAccountId}
-          />
-        ) : (
-          <span className="text-sm text-slate-500">Nenhuma conta cadastrada.</span>
-        )}
-        <button
-          onClick={() => setShowNewAccount(true)}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-        >
-          + Nova conta
-        </button>
-      </section>
-
-      {activeAccount ? (
-        <>
-          <section>
-            <AccountCard account={activeAccount} />
-          </section>
-
-          <section className="mt-6">
-            <WithdrawPanel account={activeAccount} onDone={handleDone} />
-          </section>
-
-          <section className="mt-6">
-            <TransferPanel source={activeAccount} accounts={accounts} onDone={handleDone} />
-          </section>
-
-          <section className="mt-6">
-            <HistoryPanel account={activeAccount} />
-          </section>
-        </>
+      {accounts.length > 0 ? (
+        <Sidebar
+          accounts={accounts}
+          activeAccountId={activeAccountId}
+          onSelect={setActiveAccountId}
+          onNewAccount={() => setShowNewAccount(true)}
+        />
       ) : (
-        <p className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-500">
-          Nenhuma conta ainda. Use "+ Nova conta" para criar a primeira.
-        </p>
+        <aside className="flex w-full items-center gap-3 border-border bg-panel p-5 md:w-[236px] md:flex-none md:border-r">
+          <div className="h-9 w-9 rounded-[10px] bg-gradient-to-br from-accent to-accent2" />
+          <span className="font-display text-base font-bold">Agilize</span>
+        </aside>
       )}
+
+      <main className="min-w-0 flex-1 px-5 py-7 md:px-8">
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-[13px] text-muted">Painel</div>
+            <h1 className="font-display text-2xl font-bold leading-tight">Banco Agilize</h1>
+          </div>
+          <button
+            onClick={() => setShowNewAccount(true)}
+            className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+          >
+            + Nova conta
+          </button>
+        </header>
+
+        {loadError && (
+          <div className="mb-6 rounded-xl border border-neg/30 bg-neg/10 px-4 py-3 text-sm text-neg">
+            {loadError}
+          </div>
+        )}
+
+        {toast && (
+          <div className="mb-6 rounded-xl border border-pos/30 bg-pos/10 px-4 py-3 text-sm text-pos">
+            {toast}
+          </div>
+        )}
+
+        {activeAccount ? (
+          <div className="grid items-start gap-5 lg:grid-cols-[1.55fr_1fr]">
+            <div className="flex min-w-0 flex-col gap-5">
+              <BalanceHero account={activeAccount} txs={txs} />
+              <HistoryPanel ownerName={activeAccount.owner.name} txs={txs} />
+            </div>
+            <div className="flex min-w-0 flex-col gap-5">
+              <WithdrawPanel account={activeAccount} onDone={handleDone} />
+              <TransferPanel source={activeAccount} accounts={accounts} onDone={handleDone} />
+            </div>
+          </div>
+        ) : (
+          <p className="rounded-[20px] border border-dashed border-border bg-panel px-6 py-12 text-center text-muted">
+            Nenhuma conta ainda. Use "+ Nova conta" para criar a primeira.
+          </p>
+        )}
+      </main>
 
       {showNewAccount && (
         <NewAccountModal

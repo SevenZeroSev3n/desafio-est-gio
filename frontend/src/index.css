@@ -3,5 +3,17 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-100 text-slate-800 antialiased;
+  @apply bg-bg text-text font-sans antialiased;
+}
+
+/* Inputs/selects herdam o tema dark por padrão. */
+@layer base {
+  input,
+  select,
+  textarea {
+    @apply bg-panel2 text-text;
+  }
+  ::placeholder {
+    @apply text-faint;
+  }
 }
