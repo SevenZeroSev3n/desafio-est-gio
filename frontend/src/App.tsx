@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { bankApi } from "./api/bankApi";
+import { AccountSelector } from "./components/AccountSelector";
 import { AccountCard } from "./components/AccountCard";
 import { WithdrawModal } from "./components/WithdrawModal";
 import { TransferPanel } from "./components/TransferPanel";
@@ -8,6 +9,7 @@ import type { Account } from "./types";
 
 export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [activeAccountId, setActiveAccountId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [withdrawTarget, setWithdrawTarget] = useState<Account | null>(null);
   const [historyTarget, setHistoryTarget] = useState<Account | null>(null);
@@ -15,7 +17,12 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      setAccounts(await bankApi.listAccounts());
+      const list = await bankApi.listAccounts();
+      setAccounts(list);
+      // Preserva a conta ativa por id; se ela sumiu (ou nao havia), cai na primeira.
+      setActiveAccountId((prev) =>
+        prev !== null && list.some((a) => a.id === prev) ? prev : list[0]?.id ?? null,
+      );
       setLoadError(null);
     } catch {
       setLoadError("Não foi possível carregar as contas. O backend está rodando na porta 3001?");
@@ -25,6 +32,8 @@ export default function App() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const activeAccount = accounts.find((a) => a.id === activeAccountId) ?? null;
 
   function handleDone(message: string) {
     setToast(message);
@@ -52,20 +61,35 @@ export default function App() {
         </div>
       )}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {accounts.map((a) => (
-          <AccountCard
-            key={a.id}
-            account={a}
-            onWithdraw={setWithdrawTarget}
-            onShowHistory={setHistoryTarget}
+      {accounts.length > 0 && (
+        <section className="mb-6">
+          <AccountSelector
+            accounts={accounts}
+            activeAccountId={activeAccountId}
+            onSelect={setActiveAccountId}
           />
-        ))}
-      </section>
+        </section>
+      )}
 
-      <section className="mt-8">
-        <TransferPanel accounts={accounts} onDone={handleDone} />
-      </section>
+      {activeAccount ? (
+        <>
+          <section>
+            <AccountCard
+              account={activeAccount}
+              onWithdraw={setWithdrawTarget}
+              onShowHistory={setHistoryTarget}
+            />
+          </section>
+
+          <section className="mt-8">
+            <TransferPanel accounts={accounts} onDone={handleDone} />
+          </section>
+        </>
+      ) : (
+        <p className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-500">
+          Nenhuma conta ainda.
+        </p>
+      )}
 
       {withdrawTarget && (
         <WithdrawModal
