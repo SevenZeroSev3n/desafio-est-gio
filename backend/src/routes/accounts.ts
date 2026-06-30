@@ -20,10 +20,11 @@ router.get("/", (_req, res) => {
   res.json(service.listAccounts());
 });
 
-// POST /accounts — cria uma conta (Zod valida shape; regra saldo>=0 vive no service)
+// POST /accounts — cria uma conta (Zod valida shape; regra saldo>=0 e owner vivem no service)
 router.post("/", (req, res) => {
-  const { name, type, balance } = createAccountSchema.parse(req.body);
-  res.status(201).json(service.createAccount(name, type, balance));
+  const { type, balance, owner_id, owner_name } = createAccountSchema.parse(req.body);
+  const owner = owner_id !== undefined ? { id: owner_id } : { name: owner_name! };
+  res.status(201).json(service.createAccount(type, balance, owner));
 });
 
 // POST /accounts/transfer — transferência (definida antes de /:id para não colidir)
