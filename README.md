@@ -17,7 +17,15 @@ Cada parte tem seu próprio `package.json` — rode `npm install` nas duas pasta
 
 ## Como executar
 
-Abra **dois terminais**: um para o backend, outro para o frontend.
+### 0. Clonar o repositório
+
+```bash
+git clone https://github.com/SevenZeroSev3n/desafio-est-gio.git
+cd desafio-est-gio
+```
+
+Depois abra **dois terminais** (a partir desta pasta): um para o backend, outro para o frontend.
+O frontend consome a API, então **suba o backend primeiro**.
 
 ### 1. Backend (API) — porta 3001
 
@@ -28,7 +36,7 @@ npm run dev
 ```
 
 A API sobe em `http://localhost:3001`. O banco SQLite (`backend/bank.db`) é criado e populado
-automaticamente com 3 contas de exemplo na primeira execução — nada a configurar.
+automaticamente com titulares e contas de exemplo na primeira execução — nada a configurar.
 
 ### 2. Frontend — porta 5173
 
