@@ -27,7 +27,7 @@ export function HistoryPanel({ account }: Props) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="font-semibold text-slate-900">Histórico — {account.name}</h3>
+      <h3 className="font-semibold text-slate-900">Histórico — {account.owner.name}</h3>
 
       <div className="mt-4 max-h-80 overflow-y-auto">
         {txs === null && <p className="text-sm text-slate-500">Carregando...</p>}
