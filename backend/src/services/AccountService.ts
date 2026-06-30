@@ -3,10 +3,7 @@ import type Database from "better-sqlite3";
 import { AppError } from "../errors";
 import { toCents, toReais } from "../money";
 import type { Account, AccountType, Transaction } from "../types";
-
-// Regras de negócio (seção 6 da especificação), em centavos.
-const CHECKING_FEE_CENTS = 100; // R$ 1,00 por operação (R1)
-const CHECKING_OVERDRAFT_LIMIT_CENTS = -50_000; // cheque especial até -R$ 500,00 (R1)
+import { policyFor } from "./accountPolicy";
 
 /** Conta como exposta na API: saldo em reais. */
 export interface AccountDTO {
@@ -18,7 +15,7 @@ export interface AccountDTO {
 }
 
 export class AccountService {
-  // O banco é injetado: a aplicação passa o singleton; os testes passam um :memory:.
+  // O banco é injetado pela aplicação (singleton).
   constructor(private readonly db: Database.Database) {}
 
   listAccounts(): AccountDTO[] {
@@ -32,6 +29,20 @@ export class AccountService {
     return toDTO(this.requireAccount(id));
   }
 
+  /**
+   * Cria uma conta. Regra de negócio: o saldo inicial não pode ser negativo —
+   * o cheque especial da corrente só nasce de um saque, nunca da criação.
+   */
+  createAccount(name: string, type: AccountType, initialBalance: number): AccountDTO {
+    if (initialBalance < 0) {
+      throw new AppError("Saldo inicial não pode ser negativo", "NEGATIVE_INITIAL_BALANCE", 422);
+    }
+    const info = this.db
+      .prepare("INSERT INTO accounts (name, type, balance) VALUES (?, ?, ?)")
+      .run(name, type, toCents(initialBalance));
+    return this.getAccount(Number(info.lastInsertRowid));
+  }
+
   /** Saque: aplica as regras do tipo de conta (R1/R2) e registra a transação. */
   withdraw(accountId: number, amount: number): AccountDTO & {
     fee_charged: number;
@@ -39,7 +50,7 @@ export class AccountService {
   } {
     const account = this.requireAccount(accountId);
     const amountCents = toCents(amount);
-    const feeCents = feeFor(account.type);
+    const feeCents = policyFor(account.type).feeCents;
     const newBalance = this.computeDebit(account, amountCents, feeCents);
     const txId = randomUUID();
 
@@ -67,7 +78,7 @@ export class AccountService {
     const from = this.requireAccount(fromId);
     const to = this.requireAccount(toId);
     const amountCents = toCents(amount);
-    const feeCents = feeFor(from.type);
+    const feeCents = policyFor(from.type).feeCents;
 
     const newFromBalance = this.computeDebit(from, amountCents, feeCents);
     const newToBalance = to.balance + amountCents;
@@ -113,23 +124,9 @@ export class AccountService {
     if (amountCents <= 0) {
       throw new AppError("Valor deve ser maior que zero", "INVALID_AMOUNT", 422);
     }
-    const newBalance = account.balance - amountCents - feeCents;
-
-    if (account.type === "checking" && newBalance < CHECKING_OVERDRAFT_LIMIT_CENTS) {
-      throw new AppError("Saldo insuficiente (limite de cheque especial atingido)", "INSUFFICIENT_FUNDS", 422, {
-        current_balance: toReais(account.balance),
-        requested: toReais(amountCents),
-        fee: toReais(feeCents),
-        overdraft_limit: toReais(CHECKING_OVERDRAFT_LIMIT_CENTS),
-      });
-    }
-    if (account.type === "savings" && newBalance < 0) {
-      throw new AppError("Conta poupança não pode ficar com saldo negativo", "SAVINGS_NEGATIVE_BALANCE", 422, {
-        current_balance: toReais(account.balance),
-        requested: toReais(amountCents),
-      });
-    }
-    return newBalance;
+    const newBalanceCents = account.balance - amountCents - feeCents;
+    policyFor(account.type).assertDebitAllowed({ account, amountCents, feeCents, newBalanceCents });
+    return newBalanceCents;
   }
 
   private requireAccount(id: number): Account {
@@ -155,10 +152,6 @@ export class AccountService {
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(id, accountId, type, amountCents, feeCents, balanceAfterCents);
   }
-}
-
-function feeFor(type: AccountType): number {
-  return type === "checking" ? CHECKING_FEE_CENTS : 0;
 }
 
 function toDTO(account: Account): AccountDTO {
