@@ -11,7 +11,6 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [activeAccountId, setActiveAccountId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [historyTarget, setHistoryTarget] = useState<Account | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -72,7 +71,7 @@ export default function App() {
       {activeAccount ? (
         <>
           <section>
-            <AccountCard account={activeAccount} onShowHistory={setHistoryTarget} />
+            <AccountCard account={activeAccount} />
           </section>
 
           <section className="mt-6">
@@ -82,15 +81,15 @@ export default function App() {
           <section className="mt-6">
             <TransferPanel source={activeAccount} accounts={accounts} onDone={handleDone} />
           </section>
+
+          <section className="mt-6">
+            <HistoryPanel account={activeAccount} />
+          </section>
         </>
       ) : (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-500">
           Nenhuma conta ainda.
         </p>
-      )}
-
-      {historyTarget && (
-        <HistoryPanel account={historyTarget} onClose={() => setHistoryTarget(null)} />
       )}
     </div>
   );

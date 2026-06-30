@@ -3,10 +3,9 @@ import { accountTypeLabel, formatBRL } from "../format";
 
 interface Props {
   account: Account;
-  onShowHistory: (account: Account) => void;
 }
 
-export function AccountCard({ account, onShowHistory }: Props) {
+export function AccountCard({ account }: Props) {
   const negative = account.balance < 0;
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -29,15 +28,6 @@ export function AccountCard({ account, onShowHistory }: Props) {
       <p className={`mt-4 text-2xl font-bold ${negative ? "text-rose-600" : "text-slate-900"}`}>
         {formatBRL(account.balance)}
       </p>
-
-      <div className="mt-4">
-        <button
-          onClick={() => onShowHistory(account)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-        >
-          Histórico
-        </button>
-      </div>
     </div>
   );
 }
