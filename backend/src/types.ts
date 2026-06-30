@@ -1,4 +1,4 @@
-export type AccountType = "checking" | "savings";
+export type AccountType = "checking" | "savings" | "manager";
 
 /** Titular (dono) de uma ou mais Contas. */
 export interface Titular {

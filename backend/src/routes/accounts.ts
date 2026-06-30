@@ -11,6 +11,17 @@ function parseId(raw: string): number {
   return id;
 }
 
+/**
+ * A conta do gerente é interna e intocável pelo cliente. Tratamos o id dela como
+ * inexistente (404 ACCOUNT_NOT_FOUND) — indistinguível de um id qualquer que não
+ * existe — para não confirmar a sua existência a quem sonda ids.
+ */
+function rejectIfManager(service: AccountService, id: number): void {
+  if (service.isManager(id)) {
+    throw new AppError("Conta não encontrada", "ACCOUNT_NOT_FOUND", 404);
+  }
+}
+
 /** Monta as rotas de /accounts sobre o service injetado (db real na app, :memory: nos testes). */
 export function createAccountsRouter(service: AccountService): Router {
   const router = Router();
@@ -30,23 +41,31 @@ export function createAccountsRouter(service: AccountService): Router {
   // POST /accounts/transfer — transferência (definida antes de /:id para não colidir)
   router.post("/transfer", (req, res) => {
     const { from_id, to_id, amount } = transferSchema.parse(req.body);
+    rejectIfManager(service, from_id);
+    rejectIfManager(service, to_id);
     res.json(service.transfer(from_id, to_id, amount));
   });
 
   // GET /accounts/:id — detalhe de uma conta
   router.get("/:id", (req, res) => {
-    res.json(service.getAccount(parseId(req.params.id)));
+    const id = parseId(req.params.id);
+    rejectIfManager(service, id);
+    res.json(service.getAccount(id));
   });
 
   // POST /accounts/:id/withdraw — saque
   router.post("/:id/withdraw", (req, res) => {
+    const id = parseId(req.params.id);
     const { amount } = withdrawSchema.parse(req.body);
-    res.json(service.withdraw(parseId(req.params.id), amount));
+    rejectIfManager(service, id);
+    res.json(service.withdraw(id, amount));
   });
 
   // GET /accounts/:id/history — histórico de transações
   router.get("/:id/history", (req, res) => {
-    res.json(service.history(parseId(req.params.id)));
+    const id = parseId(req.params.id);
+    rejectIfManager(service, id);
+    res.json(service.history(id));
   });
 
   return router;

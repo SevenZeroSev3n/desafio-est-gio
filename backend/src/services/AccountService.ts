@@ -33,8 +33,19 @@ export class AccountService {
   constructor(private readonly db: Database.Database) {}
 
   listAccounts(): AccountDTO[] {
-    const rows = this.db.prepare(`${SELECT_ACCOUNT} ORDER BY a.id`).all() as AccountRow[];
+    // A conta do gerente é interna: nunca aparece na listagem do cliente.
+    const rows = this.db
+      .prepare(`${SELECT_ACCOUNT} WHERE a.type != 'manager' ORDER BY a.id`)
+      .all() as AccountRow[];
     return rows.map(toDTO);
+  }
+
+  /** Verdadeiro se o id aponta para a conta interna do gerente (acumuladora de tarifas). */
+  isManager(id: number): boolean {
+    const row = this.db.prepare("SELECT type FROM accounts WHERE id = ?").get(id) as
+      | { type: AccountType }
+      | undefined;
+    return row?.type === "manager";
   }
 
   listTitulares(): Titular[] {
