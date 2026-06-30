@@ -119,3 +119,36 @@ test("transferência para a mesma conta é rejeitada", () => {
   const { service, ids } = setup([{ name: "A", type: "checking", balance: 100 }]);
   assert.equal(codeOfThrow(() => service.transfer(ids[0], ids[0], 10)), "SAME_ACCOUNT");
 });
+
+// --- criação de conta ---
+
+test("createAccount: cria corrente com saldo inicial e persiste em centavos", () => {
+  const { service, db } = setup([]);
+  const acc = service.createAccount("Ana", "checking", 100.5);
+  assert.equal(acc.name, "Ana");
+  assert.equal(acc.type, "checking");
+  assert.equal(acc.balance, 100.5);
+  assert.equal(balanceOf(db, acc.id), toCents(100.5)); // 10050
+});
+
+test("createAccount: saldo inicial 0 cria poupança zerada", () => {
+  const { service } = setup([]);
+  const acc = service.createAccount("Bia", "savings", 0);
+  assert.equal(acc.type, "savings");
+  assert.equal(acc.balance, 0);
+});
+
+test("createAccount: saldo inicial negativo é rejeitado (regra de negócio)", () => {
+  const { service } = setup([]);
+  assert.equal(
+    codeOfThrow(() => service.createAccount("Caio", "checking", -0.01)),
+    "NEGATIVE_INITIAL_BALANCE",
+  );
+});
+
+test("createAccount: saldo com 2 casas não sofre drift de float", () => {
+  const { service, db } = setup([]);
+  const acc = service.createAccount("Dora", "savings", 99.99);
+  assert.equal(acc.balance, 99.99);
+  assert.equal(balanceOf(db, acc.id), 9999);
+});
