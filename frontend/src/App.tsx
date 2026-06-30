@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { bankApi } from "./api/bankApi";
 import { AccountSelector } from "./components/AccountSelector";
 import { AccountCard } from "./components/AccountCard";
-import { WithdrawModal } from "./components/WithdrawModal";
+import { WithdrawPanel } from "./components/WithdrawPanel";
 import { TransferPanel } from "./components/TransferPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
 import type { Account } from "./types";
@@ -11,7 +11,6 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [activeAccountId, setActiveAccountId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [withdrawTarget, setWithdrawTarget] = useState<Account | null>(null);
   const [historyTarget, setHistoryTarget] = useState<Account | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -37,7 +36,6 @@ export default function App() {
 
   function handleDone(message: string) {
     setToast(message);
-    setWithdrawTarget(null);
     refresh();
     window.setTimeout(() => setToast(null), 6000);
   }
@@ -74,14 +72,14 @@ export default function App() {
       {activeAccount ? (
         <>
           <section>
-            <AccountCard
-              account={activeAccount}
-              onWithdraw={setWithdrawTarget}
-              onShowHistory={setHistoryTarget}
-            />
+            <AccountCard account={activeAccount} onShowHistory={setHistoryTarget} />
           </section>
 
-          <section className="mt-8">
+          <section className="mt-6">
+            <WithdrawPanel account={activeAccount} onDone={handleDone} />
+          </section>
+
+          <section className="mt-6">
             <TransferPanel accounts={accounts} onDone={handleDone} />
           </section>
         </>
@@ -89,14 +87,6 @@ export default function App() {
         <p className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-500">
           Nenhuma conta ainda.
         </p>
-      )}
-
-      {withdrawTarget && (
-        <WithdrawModal
-          account={withdrawTarget}
-          onClose={() => setWithdrawTarget(null)}
-          onDone={handleDone}
-        />
       )}
 
       {historyTarget && (
