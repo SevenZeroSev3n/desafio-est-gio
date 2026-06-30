@@ -92,6 +92,7 @@ export class AccountService {
     this.db.transaction(() => {
       this.setBalance(accountId, newBalance);
       this.recordTx(txId, accountId, "withdraw", amountCents, feeCents, newBalance);
+      this.creditManagerFee(txId, feeCents);
     })();
 
     return {
@@ -124,6 +125,7 @@ export class AccountService {
       this.setBalance(toId, newToBalance);
       this.recordTx(txId, fromId, "transfer_out", amountCents, feeCents, newFromBalance);
       this.recordTx(`${txId}-in`, toId, "transfer_in", amountCents, 0, newToBalance);
+      this.creditManagerFee(txId, feeCents);
     })();
 
     return {
@@ -183,6 +185,24 @@ export class AccountService {
 
   private setBalance(id: number, balanceCents: number): void {
     this.db.prepare("UPDATE accounts SET balance = ? WHERE id = ?").run(balanceCents, id);
+  }
+
+  /**
+   * Credita a tarifa de uma operação na conta interna do gerente, na mesma
+   * transação do débito. Registra uma linha (transfer_in) para o saldo do
+   * gerente seguir igual à soma do seu histórico. Tarifa zero (poupança) não
+   * gera linha. Sem conta de gerente (banco ainda não populado), é um no-op.
+   * Deve ser chamada dentro de uma transação aberta pelo chamador.
+   */
+  private creditManagerFee(sourceTxId: string, feeCents: number): void {
+    if (feeCents <= 0) return;
+    const manager = this.db.prepare("SELECT id, balance FROM accounts WHERE type = 'manager'").get() as
+      | { id: number; balance: number }
+      | undefined;
+    if (!manager) return;
+    const newBalance = manager.balance + feeCents;
+    this.setBalance(manager.id, newBalance);
+    this.recordTx(`${sourceTxId}-fee`, manager.id, "transfer_in", feeCents, 0, newBalance);
   }
 
   private recordTx(
