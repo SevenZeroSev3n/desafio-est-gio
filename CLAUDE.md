@@ -4,38 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Technical-interview challenge ("Desafio Técnico — Banco", Agilize internship). The full spec is `ESPECIFICACAO.pdf`. A fullstack **Banco** app: an HTTP API backend plus a web frontend that consumes it.
+Take-home challenge ("Desafio Técnico — Banco"): a fullstack **Banco** app — HTTP API backend + web frontend that consumes it. Authoritative spec is `ESPECIFICACAO.pdf`; don't restate it here.
 
-**Implemented stack:** backend = `backend/` TypeScript + Express + SQLite (`better-sqlite3`) + Zod; frontend = `frontend/` React + Vite + TypeScript + Tailwind. Two independent `package.json` (no monorepo tooling). Vite proxies `/api` → backend on port 3001.
+**Stack (decided):** backend `backend/` = TypeScript + Express + SQLite (`better-sqlite3`) + Zod. Frontend `frontend/` = React + Vite + TypeScript + Tailwind. Two independent `package.json` (no monorepo tooling). Vite proxies `/api` → backend on port 3001.
 
-## Hard constraints (failing any one = elimination)
+**Where the facts live** (point here, don't duplicate):
+- Domain language & model (Titular → N Contas, Tipo, Saque, Transferência) → `CONTEXT.md`.
+- Account-type rules (fee/overdraft), canonically → `CONTEXT.md §Tipo de conta` + `ESPECIFICACAO.pdf`.
+- Run/setup steps → `README.md`. Design decisions → `docs/adr/`.
 
-- **Backend language must be one of:** JavaScript (Node.js), TypeScript (Node.js), Python, Ruby, PHP, Go. Any other language disqualifies the submission.
-- **Must deliver both parts:** a backend (API, where ALL business logic lives) and a frontend (web UI that calls the API). One without the other is an automatic fail.
-- **Must run exactly as written in `README.md`.** The README must give the backend language+version, prerequisites, and the exact step-by-step to start backend and frontend and use them together. Graders run it on a clean machine; if the steps don't work, it's eliminated. Treat the README run-instructions as a deliverable, not an afterthought.
-- Business rules R1/R2 below are tested directly — they must be implemented exactly.
+## Tripwires (don't break these with an edit)
 
-## Business rules (the heart of the challenge)
+These are graded/eliminatory. Each reads "if you touch X, keep Y true":
 
-Two account types behave differently under the same operations:
-
-| | Conta Corrente | Conta Poupança |
-|---|---|---|
-| Fee per withdrawal/transfer | R$ 1,00 per operation | none |
-| Negative balance (overdraft) | allowed down to −R$ 500,00 | not allowed |
-
-- **R1 — Conta Corrente:** every withdrawal/transfer charges an extra R$ 1,00 fee on top of the amount. Balance may go negative, but `amount + fee` must not push the balance below the −R$ 500,00 overdraft limit.
-- **R2 — Conta Poupança:** withdrawals/transfers may never make the balance negative, and charge no fee.
-
-Operations:
-- **Saque (withdraw) — required.**
-- **Transferência (transfer) — optional**, scores bonus points. A transfer applies the source account's withdrawal rules (incl. the R$ 1,00 fee for Corrente) to the source side.
-
-Keep all this logic in the backend; the frontend only displays results.
-
-## Graded on
-
-Functionality (both halves run, communicate, obey the rules), code quality (clarity, separation of concerns, no duplication — so model the account-type behavior to avoid branching the same `if corrente / if poupança` logic everywhere), and process (coherent commit history — commit incrementally, not one giant final commit).
+- **All business logic stays in the backend.** The frontend only displays results — never compute fees, limits, or balances client-side. Logic leaking into React is an automatic fail.
+- **The README must run on a clean machine.** Changing ports, scripts, deps, or seed behavior means updating `README.md` in the same change. Graders run it verbatim; broken steps = elimination.
+- **The account-type rules are tested directly — don't weaken them.** When editing `AccountService`, preserve: Corrente charges R$ 1,00/op and may overdraft to −R$ 500,00; Poupança is free and never goes negative. (Exact rules: `CONTEXT.md §Tipo de conta`.)
+- **Model account-type behavior once.** No-duplication is graded: don't scatter `if corrente / if poupança` branches — keep the split in one place (currently `computeDebit()`), so a new operation doesn't re-fork the logic.
+- **Commit incrementally.** Coherent, incremental history is graded; avoid one giant final commit.
 
 ## Money handling
 
@@ -43,7 +29,7 @@ Amounts are BRL. **Money is stored and computed as integer cents** (DB columns a
 
 ## Where things live
 
-- `backend/src/services/AccountService.ts` — all business logic (withdraw, transfer). Pure class, no Express. The shared `computeDebit()` helper applies R1/R2 once for both withdraw and the transfer source (avoids duplicating the `if checking / if savings` logic). Rule constants (`CHECKING_FEE_CENTS`, `CHECKING_OVERDRAFT_LIMIT_CENTS`) live at the top.
+- `backend/src/services/AccountService.ts` — all business logic (withdraw, transfer). Pure class, no Express. The shared `computeDebit()` helper is the single place the account-type split lives — both withdraw and the transfer source go through it. Rule constants (`CHECKING_FEE_CENTS`, `CHECKING_OVERDRAFT_LIMIT_CENTS`) at the top; the rules themselves are in `CONTEXT.md`.
 - `backend/src/routes/accounts.ts` — HTTP routes; only validate (Zod) + call service + format. Note `/transfer` is registered before `/:id` to avoid route collision.
 - `backend/src/db/{database,seed}.ts` — schema created idempotently on import; `seedIfEmpty()` (called from `server.ts`) inserts 3 sample accounts. `bank.db` is git-ignored and auto-created.
 - Business errors throw `AppError` (code + HTTP status); the central handler in `app.ts` maps `AppError`/`ZodError` to JSON. Business-rule violations → HTTP 422.
