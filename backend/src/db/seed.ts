@@ -1,7 +1,7 @@
 import db from "./database";
 import { toCents } from "../money";
 
-/** Popula 3 contas de exemplo na primeira execução, para o avaliador já ver dados. */
+/** Popula 3 contas de exemplo na primeira execução. */
 export function seedIfEmpty(): void {
   const { c } = db.prepare("SELECT COUNT(*) AS c FROM accounts").get() as { c: number };
   if (c > 0) return;

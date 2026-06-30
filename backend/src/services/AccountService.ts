@@ -4,7 +4,7 @@ import { AppError } from "../errors";
 import { toCents, toReais } from "../money";
 import type { Account, AccountType, Transaction } from "../types";
 
-// Regras de negócio (seção 6 da especificação), em centavos.
+// Regras de negócio, em centavos.
 const CHECKING_FEE_CENTS = 100; // R$ 1,00 por operação (R1)
 const CHECKING_OVERDRAFT_LIMIT_CENTS = -50_000; // cheque especial até -R$ 500,00 (R1)
 
@@ -18,7 +18,7 @@ export interface AccountDTO {
 }
 
 export class AccountService {
-  // O banco é injetado: a aplicação passa o singleton; os testes passam um :memory:.
+  // O banco é injetado pela aplicação (singleton).
   constructor(private readonly db: Database.Database) {}
 
   listAccounts(): AccountDTO[] {

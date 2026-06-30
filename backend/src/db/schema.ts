@@ -1,9 +1,8 @@
 import type Database from "better-sqlite3";
 
 /**
- * Aplica o schema (idempotente) num banco já aberto. Fica separado de
- * `database.ts` — sem side-effect de import — para que os testes possam
- * montar um banco em memória isolado com o mesmo schema.
+ * Aplica o schema (idempotente) num banco já aberto. Separado de `database.ts`
+ * para não acoplar a criação do schema ao efeito colateral do import.
  */
 export function applySchema(db: Database.Database): void {
   db.pragma("foreign_keys = ON");

@@ -19,9 +19,8 @@ export const transferSchema = z.object({
   amount: money,
 });
 
-// Criação de conta: valida apenas o shape. A regra "saldo inicial >= 0" vive no
-// AccountService (responde 422), não aqui — saldo negativo passa pelo shape e o
-// service o rejeita como regra de negócio.
+// Criação de conta: valida apenas o shape. A regra "saldo inicial >= 0" é de
+// negócio e fica no AccountService.
 export const createAccountSchema = z.object({
   name: z.string().trim().min(1, "nome é obrigatório").max(100, "nome deve ter no máximo 100 caracteres"),
   type: z.enum(["checking", "savings"]),
