@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { bankApi } from "./api/bankApi";
 import { Sidebar } from "./components/Sidebar";
 import { BalanceHero } from "./components/BalanceHero";
@@ -17,6 +17,9 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showNewAccount, setShowNewAccount] = useState(false);
+  // Incrementado a cada operação concluída (saque/transferência/nova conta) para
+  // reexecutar o fetch de histórico abaixo sem trocar de conta ativa.
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -40,27 +43,40 @@ export default function App() {
   const activeAccount = accounts.find((a) => a.id === activeAccountId) ?? null;
 
   // Histórico da conta ativa, levantado aqui para o herói (sparkline/totais) e o
-  // painel de histórico compartilharem um único fetch. Guard de corrida: trocar
-  // de conta rápido pode resolver respostas fora de ordem.
+  // painel de histórico compartilharem um único fetch. Reroda ao trocar de conta
+  // OU quando historyRefreshKey muda (operação concluída na mesma conta). Guard de
+  // corrida: respostas fora de ordem (troca rápida de conta, refresh sobreposto)
+  // são descartadas via "active".
+  const lastAccountIdRef = useRef(activeAccountId);
   useEffect(() => {
+    const isAccountSwitch = lastAccountIdRef.current !== activeAccountId;
+    lastAccountIdRef.current = activeAccountId;
+
     if (activeAccountId === null) {
       setTxs(null);
       return;
     }
     let active = true;
-    setTxs(null);
+    // Só limpa para o estado de "carregando" ao trocar de conta; um refresh pós
+    // operação na mesma conta mantém os dados antigos visíveis até a resposta nova.
+    if (isAccountSwitch) setTxs(null);
     bankApi
       .history(activeAccountId)
       .then((data) => active && setTxs(data))
-      .catch(() => active && setTxs([]));
+      .catch(() => {
+        // Falha de troca de conta: mostra vazio. Falha de refresh em background:
+        // mantém o histórico antigo em tela em vez de apagar dados bons.
+        if (active && isAccountSwitch) setTxs([]);
+      });
     return () => {
       active = false;
     };
-  }, [activeAccountId]);
+  }, [activeAccountId, historyRefreshKey]);
 
   function handleDone(message: string) {
     setToast(message);
     refresh();
+    setHistoryRefreshKey((k) => k + 1);
     window.setTimeout(() => setToast(null), 6000);
   }
 
