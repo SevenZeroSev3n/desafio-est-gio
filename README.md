@@ -1,61 +1,109 @@
-# Desafio Técnico — Banco 🏦
+# Banco — Desafio Técnico Agilize 🏦
 
-Bem-vindo(a) ao desafio técnico do **Processo Seletivo Agilize — Estágio em Tecnologia**!
+Aplicação fullstack de um banco com duas contas (corrente e poupança). O **backend** expõe uma API HTTP com toda a regra de negócio; o **frontend** consome essa API para sacar, transferir e ver o histórico.
 
-Este desafio avalia sua capacidade de transformar **regras de negócio** em um sistema **fullstack**
-funcional, bem organizado e fácil de executar.
+> Especificação original do desafio em [`ESPECIFICACAO.pdf`](./ESPECIFICACAO.pdf).
 
-> 📄 **A especificação completa está no arquivo [`ESPECIFICACAO.pdf`](./ESPECIFICACAO.pdf).** Leia-a com atenção antes de começar.
->
-> ⏰ **Prazo:** 2 dias corridos — entrega até **00h de 30/06**.
+## Stack
 
----
+- **Backend:** TypeScript + Node.js (Express) · SQLite via `better-sqlite3` · validação com Zod
+- **Frontend:** React + Vite + TypeScript · Tailwind CSS
 
-## 🎯 Resumo
+## Pré-requisitos
 
-Construa um **Banco** sobre dois tipos de conta (corrente e poupança), respeitando as regras de negócio
-da especificação. A operação **obrigatória** é o **saque**; a **transferência** é **opcional** e conta
-como diferencial.
+- **Node.js 18+** e **npm 9+** (testado em Node 18.19).
 
-A solução deve ter **duas partes que se comunicam**:
+Cada parte tem seu próprio `package.json` — rode `npm install` nas duas pastas.
 
-- **Backend (API):** expõe uma API HTTP com as operações (toda a regra de negócio fica aqui).
-- **Frontend:** uma interface web que consome a API e permite realizar as operações e ver os resultados.
+## Como executar
 
-## 💻 Linguagens aceitas (backend)
+Abra **dois terminais**: um para o backend, outro para o frontend.
 
-`JavaScript (Node.js)` · `TypeScript (Node.js)` · `Python` · `Ruby` · `PHP` · `Go`
+### 1. Backend (API) — porta 3001
 
-> O **frontend** pode usar HTML/CSS/JavaScript, com ou sem framework.
+```bash
+cd backend
+npm install
+npm run dev
+```
 
----
+A API sobe em `http://localhost:3001`. O banco SQLite (`backend/bank.db`) é criado e populado
+automaticamente com 3 contas de exemplo na primeira execução — nada a configurar.
 
-## 🚀 Como participar
+### 2. Frontend — porta 5173
 
-1. Faça um **fork** deste repositório.
-2. Implemente **backend** e **frontend** no fork (backend em uma das linguagens aceitas).
-3. **Preencha o README** do seu fork seguindo o modelo em [`SUBMISSION.md`](./SUBMISSION.md)
-   (linguagem, pré-requisitos e **passo a passo para subir backend e frontend**).
-4. Faça **commits ao longo do desenvolvimento** — evite um único commit gigante no final.
-5. Envie o **link do seu fork** para **calison@agilize.com.br**.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
----
+Acesse **http://localhost:5173**. O Vite faz proxy de `/api` para o backend, então não há CORS a configurar.
 
-## ⚠️ Critério eliminatório
+## Contas de exemplo (criadas no seed)
 
-> Projetos que **não executarem** seguindo o README — ou cujo README não permita rodar **backend e
-> frontend** — serão **eliminados**. Backend fora das linguagens aceitas também elimina.
->
-> **Teste o passo a passo em uma máquina/pasta limpa antes de enviar.**
+| ID | Nome         | Tipo     | Saldo inicial |
+|----|--------------|----------|---------------|
+| 1  | João Silva   | Corrente | R$ 1.000,00   |
+| 2  | Maria Souza  | Corrente | R$ 500,00     |
+| 3  | Pedro Costa  | Poupança | R$ 800,00     |
 
----
+## Regras de negócio
 
-## ✅ O que será avaliado
+| Regra | Conta Corrente (`checking`)                          | Conta Poupança (`savings`)            |
+|-------|------------------------------------------------------|---------------------------------------|
+| Tarifa por saque/transferência | R$ 1,00 por operação                      | Isento                                |
+| Saldo negativo | Permitido até **-R$ 500,00** (cheque especial); `valor + tarifa` não pode ultrapassar o limite | **Não permitido** |
 
-- **Funcionamento** — backend e frontend rodam, se comunicam e cumprem as regras de negócio.
-- **Qualidade do código** — clareza, organização, separação de responsabilidades, sem duplicação.
-- **Processo** — histórico de commits coerente e README claro.
+Na **transferência**, a conta de origem segue as regras do seu próprio tipo (tarifa/limite); o destino
+recebe o valor integral. Débito e crédito acontecem numa transação atômica do SQLite.
 
-Dúvidas: **calison@agilize.com.br**
+> Os valores são manipulados internamente em **centavos (inteiro)** para evitar erros de ponto flutuante.
 
-Boa sorte! 🍀
+## API HTTP
+
+Base: `http://localhost:3001/api/v1`
+
+| Método | Rota                      | Descrição                                  |
+|--------|---------------------------|--------------------------------------------|
+| GET    | `/accounts`               | Lista todas as contas com saldo            |
+| GET    | `/accounts/:id`           | Detalhe de uma conta                        |
+| POST   | `/accounts`               | Cria uma conta                              |
+| POST   | `/accounts/:id/withdraw`  | Saque (aplica R1/R2)                         |
+| POST   | `/accounts/transfer`      | Transferência entre contas                  |
+| GET    | `/accounts/:id/history`   | Histórico de transações da conta            |
+
+### Exemplos
+
+```bash
+# Saque de R$ 100 na conta 1 (corrente): cobra R$ 1 de tarifa
+curl -X POST http://localhost:3001/api/v1/accounts/1/withdraw \
+  -H 'Content-Type: application/json' -d '{"amount":100}'
+
+# Transferência de R$ 50 da conta 1 para a 3
+curl -X POST http://localhost:3001/api/v1/accounts/transfer \
+  -H 'Content-Type: application/json' -d '{"from_id":1,"to_id":3,"amount":50}'
+```
+
+Erros de negócio retornam **HTTP 422** com `{ "error", "code", ... }` — ex.: `INSUFFICIENT_FUNDS`
+(estouro do cheque especial) e `SAVINGS_NEGATIVE_BALANCE` (poupança ficaria negativa).
+
+## Estrutura
+
+```
+backend/
+  src/
+    services/AccountService.ts  # regras de negócio (saque, transferência) — sem Express
+    routes/accounts.ts          # rotas HTTP + validação Zod
+    validators/schemas.ts
+    db/{database,seed}.ts        # schema + seed automático
+    money.ts errors.ts types.ts app.ts server.ts
+frontend/
+  src/
+    components/                 # AccountCard, WithdrawModal, TransferPanel, HistoryPanel
+    api/bankApi.ts              # cliente HTTP tipado
+    App.tsx main.tsx
+```
+
+Toda a regra de negócio fica isolada em `AccountService` (classe pura, sem dependência de HTTP);
+as rotas só validam a entrada, chamam o service e formatam a resposta.
