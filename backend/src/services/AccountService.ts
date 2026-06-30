@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import db from "../db/database";
+import type Database from "better-sqlite3";
 import { AppError } from "../errors";
 import { toCents, toReais } from "../money";
 import type { Account, AccountType, Transaction } from "../types";
@@ -18,8 +18,11 @@ export interface AccountDTO {
 }
 
 export class AccountService {
+  // O banco é injetado: a aplicação passa o singleton; os testes passam um :memory:.
+  constructor(private readonly db: Database.Database) {}
+
   listAccounts(): AccountDTO[] {
-    const rows = db
+    const rows = this.db
       .prepare("SELECT * FROM accounts ORDER BY id")
       .all() as Account[];
     return rows.map(toDTO);
@@ -27,13 +30,6 @@ export class AccountService {
 
   getAccount(id: number): AccountDTO {
     return toDTO(this.requireAccount(id));
-  }
-
-  createAccount(name: string, type: AccountType, initialBalance: number): AccountDTO {
-    const info = db
-      .prepare("INSERT INTO accounts (name, type, balance) VALUES (?, ?, ?)")
-      .run(name, type, toCents(initialBalance));
-    return this.getAccount(Number(info.lastInsertRowid));
   }
 
   /** Saque: aplica as regras do tipo de conta (R1/R2) e registra a transação. */
@@ -47,7 +43,7 @@ export class AccountService {
     const newBalance = this.computeDebit(account, amountCents, feeCents);
     const txId = randomUUID();
 
-    db.transaction(() => {
+    this.db.transaction(() => {
       this.setBalance(accountId, newBalance);
       this.recordTx(txId, accountId, "withdraw", amountCents, feeCents, newBalance);
     })();
@@ -77,7 +73,7 @@ export class AccountService {
     const newToBalance = to.balance + amountCents;
     const txId = randomUUID();
 
-    db.transaction(() => {
+    this.db.transaction(() => {
       this.setBalance(fromId, newFromBalance);
       this.setBalance(toId, newToBalance);
       this.recordTx(txId, fromId, "transfer_out", amountCents, feeCents, newFromBalance);
@@ -94,7 +90,7 @@ export class AccountService {
 
   history(accountId: number) {
     this.requireAccount(accountId);
-    const rows = db
+    const rows = this.db
       .prepare("SELECT * FROM transactions WHERE account_id = ? ORDER BY created_at DESC, id DESC")
       .all(accountId) as Transaction[];
     return rows.map((t) => ({
@@ -137,13 +133,13 @@ export class AccountService {
   }
 
   private requireAccount(id: number): Account {
-    const account = db.prepare("SELECT * FROM accounts WHERE id = ?").get(id) as Account | undefined;
+    const account = this.db.prepare("SELECT * FROM accounts WHERE id = ?").get(id) as Account | undefined;
     if (!account) throw new AppError("Conta não encontrada", "ACCOUNT_NOT_FOUND", 404);
     return account;
   }
 
   private setBalance(id: number, balanceCents: number): void {
-    db.prepare("UPDATE accounts SET balance = ? WHERE id = ?").run(balanceCents, id);
+    this.db.prepare("UPDATE accounts SET balance = ? WHERE id = ?").run(balanceCents, id);
   }
 
   private recordTx(
@@ -154,7 +150,7 @@ export class AccountService {
     feeCents: number,
     balanceAfterCents: number,
   ): void {
-    db.prepare(
+    this.db.prepare(
       `INSERT INTO transactions (id, account_id, type, amount, fee, balance_after)
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(id, accountId, type, amountCents, feeCents, balanceAfterCents);

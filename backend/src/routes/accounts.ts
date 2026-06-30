@@ -1,10 +1,11 @@
 import { Router } from "express";
+import db from "../db/database";
 import { AccountService } from "../services/AccountService";
 import { AppError } from "../errors";
-import { createAccountSchema, transferSchema, withdrawSchema } from "../validators/schemas";
+import { transferSchema, withdrawSchema } from "../validators/schemas";
 
 const router = Router();
-const service = new AccountService();
+const service = new AccountService(db);
 
 function parseId(raw: string): number {
   const id = Number(raw);
@@ -28,12 +29,6 @@ router.post("/transfer", (req, res) => {
 // GET /accounts/:id — detalhe de uma conta
 router.get("/:id", (req, res) => {
   res.json(service.getAccount(parseId(req.params.id)));
-});
-
-// POST /accounts — cria conta
-router.post("/", (req, res) => {
-  const { name, type, balance } = createAccountSchema.parse(req.body);
-  res.status(201).json(service.createAccount(name, type, balance));
 });
 
 // POST /accounts/:id/withdraw — saque

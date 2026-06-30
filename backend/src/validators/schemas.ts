@@ -17,9 +17,3 @@ export const transferSchema = z.object({
   to_id: z.number().int().positive(),
   amount: money,
 });
-
-export const createAccountSchema = z.object({
-  name: z.string().min(1),
-  type: z.enum(["checking", "savings"]),
-  balance: z.number().nonnegative().default(0),
-});
