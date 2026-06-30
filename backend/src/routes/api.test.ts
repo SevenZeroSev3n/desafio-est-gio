@@ -1,21 +1,11 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
-import Database from "better-sqlite3";
-import { applySchema } from "../db/schema";
 import { createApp } from "../app";
-import { toCents } from "../money";
-import type { AccountType } from "../types";
+import { makeTestDb, type AccountSeed } from "../test/fixtures";
 
 /** App Express sobre um :memory: isolado, com as contas dadas como fixtures. */
-function makeApp(accounts: Array<{ name: string; type: AccountType; balance: number }> = []) {
-  const db = new Database(":memory:");
-  applySchema(db);
-  const insTitular = db.prepare("INSERT INTO titulares (nome) VALUES (?)");
-  const insAccount = db.prepare("INSERT INTO accounts (owner_id, type, balance) VALUES (?, ?, ?)");
-  const ids = accounts.map((a) => {
-    const ownerId = Number(insTitular.run(a.name).lastInsertRowid);
-    return Number(insAccount.run(ownerId, a.type, toCents(a.balance)).lastInsertRowid);
-  });
+function makeApp(accounts: AccountSeed[] = []) {
+  const { db, ids } = makeTestDb(accounts);
   return { app: createApp(db), ids };
 }
 

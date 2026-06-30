@@ -1,21 +1,13 @@
 import { describe, it, expect } from "vitest";
-import Database from "better-sqlite3";
-import { applySchema } from "../db/schema";
+import type Database from "better-sqlite3";
 import { AppError } from "../errors";
 import { toCents } from "../money";
 import { AccountService } from "./AccountService";
-import type { AccountType } from "../types";
+import { makeTestDb, type AccountSeed } from "../test/fixtures";
 
-/** Cria um banco em memória isolado com as contas dadas (cada uma com seu titular). */
-function setup(accounts: Array<{ name: string; type: AccountType; balance: number }>) {
-  const db = new Database(":memory:");
-  applySchema(db);
-  const insTitular = db.prepare("INSERT INTO titulares (nome) VALUES (?)");
-  const insAccount = db.prepare("INSERT INTO accounts (owner_id, type, balance) VALUES (?, ?, ?)");
-  const ids = accounts.map((a) => {
-    const ownerId = Number(insTitular.run(a.name).lastInsertRowid);
-    return Number(insAccount.run(ownerId, a.type, toCents(a.balance)).lastInsertRowid);
-  });
+/** Service sobre um banco em memória isolado com as contas dadas como fixtures. */
+function setup(accounts: AccountSeed[] = []) {
+  const { db, ids } = makeTestDb(accounts);
   return { service: new AccountService(db), db, ids };
 }
 
