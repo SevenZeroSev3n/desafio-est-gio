@@ -80,7 +80,7 @@ export default function App() {
           </section>
 
           <section className="mt-6">
-            <TransferPanel accounts={accounts} onDone={handleDone} />
+            <TransferPanel source={activeAccount} accounts={accounts} onDone={handleDone} />
           </section>
         </>
       ) : (
