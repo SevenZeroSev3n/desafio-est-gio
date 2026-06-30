@@ -26,3 +26,6 @@ build/
 .vscode/
 .DS_Store
 *.swp
+
+# Config local das engineering skills (não compartilhado)
+docs/agents/
