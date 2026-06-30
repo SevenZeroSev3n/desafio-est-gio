@@ -32,6 +32,20 @@ export class AccountService {
     return toDTO(this.requireAccount(id));
   }
 
+  /**
+   * Cria uma conta. Regra de negócio: o saldo inicial não pode ser negativo —
+   * o cheque especial da corrente só nasce de um saque, nunca da criação.
+   */
+  createAccount(name: string, type: AccountType, initialBalance: number): AccountDTO {
+    if (initialBalance < 0) {
+      throw new AppError("Saldo inicial não pode ser negativo", "NEGATIVE_INITIAL_BALANCE", 422);
+    }
+    const info = this.db
+      .prepare("INSERT INTO accounts (name, type, balance) VALUES (?, ?, ?)")
+      .run(name, type, toCents(initialBalance));
+    return this.getAccount(Number(info.lastInsertRowid));
+  }
+
   /** Saque: aplica as regras do tipo de conta (R1/R2) e registra a transação. */
   withdraw(accountId: number, amount: number): AccountDTO & {
     fee_charged: number;

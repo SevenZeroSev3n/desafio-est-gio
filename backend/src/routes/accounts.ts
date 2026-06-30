@@ -2,7 +2,7 @@ import { Router } from "express";
 import db from "../db/database";
 import { AccountService } from "../services/AccountService";
 import { AppError } from "../errors";
-import { transferSchema, withdrawSchema } from "../validators/schemas";
+import { createAccountSchema, transferSchema, withdrawSchema } from "../validators/schemas";
 
 const router = Router();
 const service = new AccountService(db);
@@ -18,6 +18,12 @@ function parseId(raw: string): number {
 // GET /accounts — lista todas as contas
 router.get("/", (_req, res) => {
   res.json(service.listAccounts());
+});
+
+// POST /accounts — cria uma conta (Zod valida shape; regra saldo>=0 vive no service)
+router.post("/", (req, res) => {
+  const { name, type, balance } = createAccountSchema.parse(req.body);
+  res.status(201).json(service.createAccount(name, type, balance));
 });
 
 // POST /accounts/transfer — transferência (definida antes de /:id para não colidir)
