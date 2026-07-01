@@ -27,14 +27,17 @@ npm run dev          # http://localhost:5173 (proxy /api -> backend; suba o back
 ```
 
 ## Exemplo de uso
-1. Abra http://localhost:5173 — escolha a **conta ativa** no seletor (agrupado por titular;
-   João Silva tem corrente **e** poupança).
+1. Abra http://localhost:5173 — no menu lateral escolha o cliente em **Visualizando** (Titular) e
+   navegue pelas telas **Início / Contas / Histórico**. No **Início**, selecione a conta ativa
+   (João Silva tem corrente **e** poupança).
 2. No painel **Saque**, saque R$ 100 de uma corrente: a API debita R$ 100 + R$ 1,00 de tarifa
    e a tela atualiza.
 3. Tente estourar o limite (zerar abaixo de 0 numa poupança, ou passar de -R$ 500 numa corrente):
    a API responde **422** e a UI mostra a mensagem de erro de negócio.
 4. Use **Transferência** (origem = conta ativa) e veja o **Histórico** da conta ativa.
 5. Em **+ Nova conta**, crie uma conta para um titular existente ou novo.
+6. Abra a aba **Carteira do gerente**: ela mostra o total de tarifas acumuladas (R$ 1,00 por
+   operação de corrente) e o extrato dessas tarifas.
 
 ## Como rodar os testes
 ```bash
@@ -45,6 +48,9 @@ CI (GitHub Actions) roda as duas suítes em cada PR para `main`, na matriz Node 
 
 ## Observações
 - Operação obrigatória (**saque**) e o diferencial (**transferência**) implementados.
+- Extra: **carteira do gerente** — as tarifas das correntes são creditadas numa conta interna
+  (tipo `manager`, escondida do cliente) na mesma transação do débito; exposta por `GET /manager`
+  e `/manager/history` e por uma aba na UI.
 - Modelo de domínio: **Titular** dono de N **Contas** (nome só no titular — fonte única da verdade).
 - Regra de negócio isolada em `AccountService` (classe pura, sem Express); o comportamento por tipo
   de conta vive em `AccountPolicy` (sem `if corrente/poupança` espalhado). Rotas só validam e formatam.
