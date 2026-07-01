@@ -2,8 +2,9 @@ import { randomUUID } from "crypto";
 import type Database from "better-sqlite3";
 import { AppError } from "../errors";
 import { toCents, toReais } from "../money";
-import type { Account, AccountType, Titular, Transaction } from "../types";
+import type { Account, AccountType, Titular } from "../types";
 import { policyFor } from "./accountPolicy";
+import { AccountRepository, type AccountRow } from "./AccountRepository";
 
 /** Conta como exposta na API: saldo em reais, com o titular dono aninhado. */
 export interface AccountDTO {
@@ -14,49 +15,30 @@ export interface AccountDTO {
   owner: { id: number; name: string };
 }
 
-/** Linha de conta já com o nome do titular (resultado do join). */
-interface AccountRow extends Account {
-  owner_name: string;
-}
-
 /** Referência ao titular na criação: um existente (id) ou um novo (name). */
 export type OwnerRef = { id: number } | { name: string };
 
-const SELECT_ACCOUNT = `
-  SELECT a.id, a.owner_id, a.type, a.balance, a.created_at, t.nome AS owner_name
-  FROM accounts a
-  JOIN titulares t ON t.id = a.owner_id
-`;
-
+/** Regras de negócio (saque, transferência, criação, carteira do gerente). Persistência fica em AccountRepository. */
 export class AccountService {
-  // O banco é injetado pela aplicação (singleton).
-  constructor(private readonly db: Database.Database) {}
+  private readonly repo: AccountRepository;
+
+  constructor(db: Database.Database) {
+    this.repo = new AccountRepository(db);
+  }
 
   listAccounts(): AccountDTO[] {
     // A conta do gerente é interna: nunca aparece na listagem do cliente.
-    const rows = this.db
-      .prepare(`${SELECT_ACCOUNT} WHERE a.type != 'manager' ORDER BY a.id`)
-      .all() as AccountRow[];
-    return rows.map(toDTO);
+    return this.repo.listVisible().map(toDTO);
   }
 
   /** Verdadeiro se o id aponta para a conta interna do gerente (acumuladora de tarifas). */
   isManager(id: number): boolean {
-    const row = this.db.prepare("SELECT type FROM accounts WHERE id = ?").get(id) as
-      | { type: AccountType }
-      | undefined;
-    return row?.type === "manager";
+    return this.repo.findTypeById(id) === "manager";
   }
 
   listTitulares(): Titular[] {
     // O titular dono da conta interna do gerente não é um cliente: fica de fora.
-    return this.db
-      .prepare(
-        `SELECT id, nome FROM titulares
-         WHERE id NOT IN (SELECT owner_id FROM accounts WHERE type = 'manager')
-         ORDER BY id`,
-      )
-      .all() as Titular[];
+    return this.repo.listTitulares();
   }
 
   /** Carteira interna do gerente: a conta que acumula as tarifas das correntes. */
@@ -83,14 +65,10 @@ export class AccountService {
       throw new AppError("Saldo inicial não pode ser negativo", "NEGATIVE_INITIAL_BALANCE", 422);
     }
 
-    let accountId = 0;
-    this.db.transaction(() => {
-      const ownerId = "id" in owner ? this.requireTitular(owner.id) : this.createTitular(owner.name);
-      const info = this.db
-        .prepare("INSERT INTO accounts (owner_id, type, balance) VALUES (?, ?, ?)")
-        .run(ownerId, type, toCents(initialBalance));
-      accountId = Number(info.lastInsertRowid);
-    })();
+    const accountId = this.repo.transaction(() => {
+      const ownerId = "id" in owner ? this.requireTitular(owner.id) : this.repo.insertTitular(owner.name);
+      return this.repo.insertAccount(ownerId, type, toCents(initialBalance));
+    });
 
     return this.getAccount(accountId);
   }
@@ -106,11 +84,11 @@ export class AccountService {
     const newBalance = this.computeDebit(account, amountCents, feeCents);
     const txId = randomUUID();
 
-    this.db.transaction(() => {
-      this.setBalance(accountId, newBalance);
-      this.recordTx(txId, accountId, "withdraw", amountCents, feeCents, newBalance);
+    this.repo.transaction(() => {
+      this.repo.setBalance(accountId, newBalance);
+      this.repo.insertTransaction(txId, accountId, "withdraw", amountCents, feeCents, newBalance);
       this.creditManagerFee(txId, feeCents);
-    })();
+    });
 
     return {
       ...toDTO({ ...account, balance: newBalance }),
@@ -137,13 +115,13 @@ export class AccountService {
     const newToBalance = to.balance + amountCents;
     const txId = randomUUID();
 
-    this.db.transaction(() => {
-      this.setBalance(fromId, newFromBalance);
-      this.setBalance(toId, newToBalance);
-      this.recordTx(txId, fromId, "transfer_out", amountCents, feeCents, newFromBalance);
-      this.recordTx(`${txId}-in`, toId, "transfer_in", amountCents, 0, newToBalance);
+    this.repo.transaction(() => {
+      this.repo.setBalance(fromId, newFromBalance);
+      this.repo.setBalance(toId, newToBalance);
+      this.repo.insertTransaction(txId, fromId, "transfer_out", amountCents, feeCents, newFromBalance);
+      this.repo.insertTransaction(`${txId}-in`, toId, "transfer_in", amountCents, 0, newToBalance);
       this.creditManagerFee(txId, feeCents);
-    })();
+    });
 
     return {
       from: toDTO({ ...from, balance: newFromBalance }),
@@ -155,10 +133,7 @@ export class AccountService {
 
   history(accountId: number) {
     this.requireAccount(accountId);
-    const rows = this.db
-      .prepare("SELECT * FROM transactions WHERE account_id = ? ORDER BY created_at DESC, id DESC")
-      .all(accountId) as Transaction[];
-    return rows.map((t) => ({
+    return this.repo.listTransactions(accountId).map((t) => ({
       id: t.id,
       type: t.type,
       amount: toReais(t.amount),
@@ -168,7 +143,7 @@ export class AccountService {
     }));
   }
 
-  // --- helpers privados (lógica única, sem duplicação entre saque e transferência) ---
+  // --- helpers privados (regra de negócio; nenhum SQL aqui — vive em AccountRepository) ---
 
   /**
    * Valida valor e regras do tipo de conta para um débito de `amountCents` +
@@ -184,30 +159,21 @@ export class AccountService {
   }
 
   private requireAccount(id: number): AccountRow {
-    const row = this.db.prepare(`${SELECT_ACCOUNT} WHERE a.id = ?`).get(id) as AccountRow | undefined;
+    const row = this.repo.findById(id);
     if (!row) throw new AppError("Conta não encontrada", "ACCOUNT_NOT_FOUND", 404);
     return row;
   }
 
   private requireManager(): AccountRow {
-    const row = this.db.prepare(`${SELECT_ACCOUNT} WHERE a.type = 'manager'`).get() as AccountRow | undefined;
+    const row = this.repo.findManager();
     if (!row) throw new AppError("Conta do gerente não encontrada", "MANAGER_NOT_FOUND", 404);
     return row;
   }
 
   private requireTitular(id: number): number {
-    const row = this.db.prepare("SELECT id FROM titulares WHERE id = ?").get(id) as { id: number } | undefined;
-    if (!row) throw new AppError("Titular não encontrado", "OWNER_NOT_FOUND", 422);
-    return row.id;
-  }
-
-  private createTitular(nome: string): number {
-    const info = this.db.prepare("INSERT INTO titulares (nome) VALUES (?)").run(nome);
-    return Number(info.lastInsertRowid);
-  }
-
-  private setBalance(id: number, balanceCents: number): void {
-    this.db.prepare("UPDATE accounts SET balance = ? WHERE id = ?").run(balanceCents, id);
+    const ownerId = this.repo.findTitularId(id);
+    if (ownerId === undefined) throw new AppError("Titular não encontrado", "OWNER_NOT_FOUND", 422);
+    return ownerId;
   }
 
   /**
@@ -219,27 +185,11 @@ export class AccountService {
    */
   private creditManagerFee(sourceTxId: string, feeCents: number): void {
     if (feeCents <= 0) return;
-    const manager = this.db.prepare("SELECT id, balance FROM accounts WHERE type = 'manager'").get() as
-      | { id: number; balance: number }
-      | undefined;
+    const manager = this.repo.findManager();
     if (!manager) return;
     const newBalance = manager.balance + feeCents;
-    this.setBalance(manager.id, newBalance);
-    this.recordTx(`${sourceTxId}-fee`, manager.id, "transfer_in", feeCents, 0, newBalance);
-  }
-
-  private recordTx(
-    id: string,
-    accountId: number,
-    type: Transaction["type"],
-    amountCents: number,
-    feeCents: number,
-    balanceAfterCents: number,
-  ): void {
-    this.db.prepare(
-      `INSERT INTO transactions (id, account_id, type, amount, fee, balance_after)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(id, accountId, type, amountCents, feeCents, balanceAfterCents);
+    this.repo.setBalance(manager.id, newBalance);
+    this.repo.insertTransaction(`${sourceTxId}-fee`, manager.id, "transfer_in", feeCents, 0, newBalance);
   }
 }
 
