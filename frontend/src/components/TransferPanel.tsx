@@ -41,58 +41,60 @@ export function TransferPanel({ source, accounts, onDone }: Props) {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="font-semibold text-slate-900">Transferência</h3>
-      <p className="mt-1 text-xs text-slate-400">A origem segue as regras do seu tipo de conta (tarifa/limite).</p>
+    <form
+      onSubmit={submit}
+      id="transferencia"
+      className="scroll-mt-4 rounded-[20px] border border-border bg-panel p-6 shadow-panel"
+    >
+      <h3 className="font-display text-base font-bold">Transferência</h3>
+      <p className="mt-1 text-[11.5px] leading-relaxed text-muted">
+        A origem segue as regras do seu tipo de conta (tarifa/limite).
+      </p>
 
       {destinations.length === 0 ? (
-        <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+        <p className="mt-4 rounded-xl bg-panel2 px-3 py-2.5 text-sm text-muted">
           Não há outra conta para receber a transferência.
         </p>
       ) : (
         <>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div>
-              <span className="block text-sm font-medium text-slate-700">De</span>
-              <p className="mt-1 rounded-lg bg-slate-50 px-2 py-2 text-sm text-slate-600">
-                {source.owner.name} · {accountTypeLabel(source.type)}
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Para</label>
-              <select
-                value={toId}
-                onChange={(e) => setToId(e.target.value === "" ? "" : Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-2 text-sm"
-              >
-                <option value="">Selecione</option>
-                {destinations.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.owner.name} — {accountTypeLabel(a.type)} ({formatBRL(a.balance)})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Valor (R$)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0,00"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
+          <label className="mt-4 block text-[11.5px] font-semibold text-muted">De</label>
+          <div className="mt-1.5 rounded-xl border border-border bg-panel2 px-3.5 py-3 text-[13px] text-muted">
+            {source.owner.name} · {accountTypeLabel(source.type)}
           </div>
 
-          {error && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+          <label className="mt-3.5 block text-[11.5px] font-semibold text-muted">Para</label>
+          <select
+            value={toId}
+            onChange={(e) => setToId(e.target.value === "" ? "" : Number(e.target.value))}
+            className="mt-1.5 w-full rounded-xl border border-border px-3.5 py-3 text-[13px] outline-none focus:border-accent"
+          >
+            <option value="">Selecione</option>
+            {destinations.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.owner.name} — {accountTypeLabel(a.type)} ({formatBRL(a.balance)})
+              </option>
+            ))}
+          </select>
+
+          <label className="mt-3.5 block text-[11.5px] font-semibold text-muted">Valor (R$)</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0,00"
+            className="mt-1.5 w-full rounded-xl border border-border px-3.5 py-3 font-display text-[15px] font-semibold outline-none focus:border-accent"
+          />
+
+          {error && (
+            <p className="mt-3 rounded-xl border border-neg/30 bg-neg/10 px-3 py-2 text-sm text-neg">{error}</p>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="mt-3 w-full rounded-xl bg-gradient-to-br from-accent to-accent2 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
           >
             {loading ? "Processando..." : "Transferir"}
           </button>

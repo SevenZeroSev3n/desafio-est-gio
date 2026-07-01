@@ -1,4 +1,4 @@
-export type AccountType = "checking" | "savings";
+export type AccountType = "checking" | "savings" | "manager";
 
 export interface Titular {
   id: number;

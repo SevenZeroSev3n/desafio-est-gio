@@ -1,21 +1,13 @@
 import { describe, it, expect } from "vitest";
-import Database from "better-sqlite3";
-import { applySchema } from "../db/schema";
+import type Database from "better-sqlite3";
 import { AppError } from "../errors";
 import { toCents } from "../money";
 import { AccountService } from "./AccountService";
-import type { AccountType } from "../types";
+import { makeTestDb, type AccountSeed } from "../test/fixtures";
 
-/** Cria um banco em memória isolado com as contas dadas (cada uma com seu titular). */
-function setup(accounts: Array<{ name: string; type: AccountType; balance: number }>) {
-  const db = new Database(":memory:");
-  applySchema(db);
-  const insTitular = db.prepare("INSERT INTO titulares (nome) VALUES (?)");
-  const insAccount = db.prepare("INSERT INTO accounts (owner_id, type, balance) VALUES (?, ?, ?)");
-  const ids = accounts.map((a) => {
-    const ownerId = Number(insTitular.run(a.name).lastInsertRowid);
-    return Number(insAccount.run(ownerId, a.type, toCents(a.balance)).lastInsertRowid);
-  });
+/** Service sobre um banco em memória isolado com as contas dadas como fixtures. */
+function setup(accounts: AccountSeed[] = []) {
+  const { db, ids } = makeTestDb(accounts);
   return { service: new AccountService(db), db, ids };
 }
 
@@ -29,6 +21,22 @@ function countTitulares(db: Database.Database): number {
 
 function ownerOf(db: Database.Database, accountId: number): number {
   return (db.prepare("SELECT owner_id FROM accounts WHERE id = ?").get(accountId) as { owner_id: number }).owner_id;
+}
+
+/** Linhas de transação de uma conta (campos relevantes), em ordem de inserção. */
+function txRowsOf(db: Database.Database, accountId: number) {
+  return db
+    .prepare("SELECT type, amount, fee FROM transactions WHERE account_id = ? ORDER BY id")
+    .all(accountId) as Array<{ type: string; amount: number; fee: number }>;
+}
+
+/** Soma dos valores das linhas de uma conta (para checar saldo == soma do histórico). */
+function txSumOf(db: Database.Database, accountId: number): number {
+  return (
+    db.prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM transactions WHERE account_id = ?").get(accountId) as {
+      s: number;
+    }
+  ).s;
 }
 
 /** Executa `fn` esperando um AppError e devolve o seu `code`. */
@@ -155,6 +163,89 @@ describe("transferência", () => {
   it("para a mesma conta é rejeitada", () => {
     const { service, ids } = setup([{ name: "A", type: "checking", balance: 100 }]);
     expect(codeOfThrow(() => service.transfer(ids[0], ids[0], 10))).toBe("SAME_ACCOUNT");
+  });
+});
+
+describe("tarifa é creditada na conta do gerente", () => {
+  it("saque de corrente credita a tarifa (R$ 1) no gerente, como uma linha transfer_in", () => {
+    const { service, db, ids } = setup([
+      { name: "Cliente", type: "checking", balance: 1000 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    service.withdraw(ids[0], 100);
+    expect(balanceOf(db, ids[1])).toBe(toCents(1)); // só a tarifa
+    expect(txRowsOf(db, ids[1])).toEqual([{ type: "transfer_in", amount: 100, fee: 0 }]);
+  });
+
+  it("saque de poupança não credita nada nem cria linha no gerente (sem lixo R$ 0)", () => {
+    const { service, db, ids } = setup([
+      { name: "Cliente", type: "savings", balance: 800 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    service.withdraw(ids[0], 800);
+    expect(balanceOf(db, ids[1])).toBe(0);
+    expect(txRowsOf(db, ids[1])).toEqual([]);
+  });
+
+  it("transferência de origem corrente credita a tarifa no gerente", () => {
+    const { service, db, ids } = setup([
+      { name: "Origem", type: "checking", balance: 1000 },
+      { name: "Destino", type: "savings", balance: 0 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    service.transfer(ids[0], ids[1], 100);
+    expect(balanceOf(db, ids[2])).toBe(toCents(1));
+  });
+
+  it("saldo do gerente é igual à soma das suas linhas após várias tarifas (sem drift)", () => {
+    const { service, db, ids } = setup([
+      { name: "Cliente", type: "checking", balance: 1000 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    service.withdraw(ids[0], 100);
+    service.withdraw(ids[0], 100);
+    service.withdraw(ids[0], 100);
+    expect(balanceOf(db, ids[1])).toBe(toCents(3)); // 3 × R$ 1
+    expect(txSumOf(db, ids[1])).toBe(balanceOf(db, ids[1]));
+  });
+});
+
+describe("carteira do gerente (leitura)", () => {
+  it("getManagerWallet devolve o saldo acumulado de tarifas", () => {
+    const { service, ids } = setup([
+      { name: "Cliente", type: "checking", balance: 1000 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    service.withdraw(ids[0], 100);
+    expect(service.getManagerWallet().balance).toBe(1); // R$ 1,00
+    expect(service.getManagerWallet().type).toBe("manager");
+  });
+
+  it("getManagerWallet dá 404 quando não há conta de gerente", () => {
+    const { service } = setup([{ name: "Cliente", type: "checking", balance: 100 }]);
+    expect(codeOfThrow(() => service.getManagerWallet())).toBe("MANAGER_NOT_FOUND");
+  });
+
+  it("managerHistory devolve as tarifas creditadas", () => {
+    const { service, ids } = setup([
+      { name: "Cliente", type: "checking", balance: 1000 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    service.withdraw(ids[0], 100);
+    const hist = service.managerHistory();
+    expect(hist).toHaveLength(1);
+    expect(hist[0].type).toBe("transfer_in");
+    expect(hist[0].amount).toBe(1);
+  });
+
+  it("listTitulares esconde o titular do gerente", () => {
+    const { service } = setup([
+      { name: "João", type: "checking", balance: 100 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    const nomes = service.listTitulares().map((t) => t.nome);
+    expect(nomes).toContain("João");
+    expect(nomes).not.toContain("Gerente");
   });
 });
 

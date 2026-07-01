@@ -47,17 +47,17 @@ export function NewAccountModal({ titulares, onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
-        className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+        className="w-full max-w-sm rounded-[20px] border border-border bg-panel p-6 shadow-panel"
       >
-        <h2 className="text-lg font-semibold text-slate-900">Nova conta</h2>
+        <h2 className="font-display text-lg font-bold">Nova conta</h2>
 
-        <span className="mt-4 block text-sm font-medium text-slate-700">Titular</span>
+        <span className="mt-4 block text-sm font-medium text-muted">Titular</span>
         <div className="mt-1 flex gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-text">
             <input
               type="radio"
               name="owner-mode"
@@ -67,7 +67,7 @@ export function NewAccountModal({ titulares, onClose, onCreated }: Props) {
             />
             Existente
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-text">
             <input
               type="radio"
               name="owner-mode"
@@ -82,7 +82,7 @@ export function NewAccountModal({ titulares, onClose, onCreated }: Props) {
           <select
             value={ownerId}
             onChange={(e) => setOwnerId(e.target.value === "" ? "" : Number(e.target.value))}
-            className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-accent"
           >
             <option value="">Selecione</option>
             {titulares.map((t) => (
@@ -97,44 +97,44 @@ export function NewAccountModal({ titulares, onClose, onCreated }: Props) {
             value={ownerName}
             onChange={(e) => setOwnerName(e.target.value)}
             maxLength={100}
-            className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-accent"
             placeholder="Nome do titular"
           />
         )}
 
-        <span className="mt-4 block text-sm font-medium text-slate-700">Tipo</span>
+        <span className="mt-4 block text-sm font-medium text-muted">Tipo</span>
         <div className="mt-1 flex gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-text">
             <input type="radio" name="type" checked={type === "checking"} onChange={() => setType("checking")} />
             Conta Corrente
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-text">
             <input type="radio" name="type" checked={type === "savings"} onChange={() => setType("savings")} />
             Conta Poupança
           </label>
         </div>
 
-        <label className="mt-4 block text-sm font-medium text-slate-700">Saldo inicial (R$)</label>
+        <label className="mt-4 block text-sm font-medium text-muted">Saldo inicial (R$)</label>
         <input
           type="number"
           step="0.01"
           min="0"
           value={balance}
           onChange={(e) => setBalance(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-accent"
           placeholder="0,00 (opcional)"
         />
 
-        {error && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+        {error && <p className="mt-3 rounded-xl border border-neg/30 bg-neg/10 px-3 py-2 text-sm text-neg">{error}</p>}
 
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">
+          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm text-muted transition hover:bg-panel2">
             Cancelar
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
           >
             {loading ? "Criando..." : "Criar conta"}
           </button>

@@ -1,21 +1,11 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
-import Database from "better-sqlite3";
-import { applySchema } from "../db/schema";
 import { createApp } from "../app";
-import { toCents } from "../money";
-import type { AccountType } from "../types";
+import { makeTestDb, type AccountSeed } from "../test/fixtures";
 
 /** App Express sobre um :memory: isolado, com as contas dadas como fixtures. */
-function makeApp(accounts: Array<{ name: string; type: AccountType; balance: number }> = []) {
-  const db = new Database(":memory:");
-  applySchema(db);
-  const insTitular = db.prepare("INSERT INTO titulares (nome) VALUES (?)");
-  const insAccount = db.prepare("INSERT INTO accounts (owner_id, type, balance) VALUES (?, ?, ?)");
-  const ids = accounts.map((a) => {
-    const ownerId = Number(insTitular.run(a.name).lastInsertRowid);
-    return Number(insAccount.run(ownerId, a.type, toCents(a.balance)).lastInsertRowid);
-  });
+function makeApp(accounts: AccountSeed[] = []) {
+  const { db, ids } = makeTestDb(accounts);
   return { app: createApp(db), ids };
 }
 
@@ -133,6 +123,27 @@ describe("POST /accounts", () => {
     const res = await request(app).post("/api/v1/accounts").send({ type: "savings", owner_name: "Zoe 🦊" });
     expect(res.status).toBe(201);
     expect(res.body.owner.name).toBe("Zoe 🦊");
+  });
+});
+
+describe("conta do gerente é invisível para o cliente", () => {
+  it("404 ao sacar da conta do gerente (indistinguível de inexistente)", async () => {
+    const { app, ids } = makeApp([{ name: "Gerente", type: "manager", balance: 5000 }]);
+    const res = await request(app).post(`/api/v1/accounts/${ids[0]}/withdraw`).send({ amount: 100 });
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("ACCOUNT_NOT_FOUND");
+  });
+
+  it("404 ao transferir para a conta do gerente", async () => {
+    const { app, ids } = makeApp([
+      { name: "Cliente", type: "checking", balance: 1000 },
+      { name: "Gerente", type: "manager", balance: 0 },
+    ]);
+    const res = await request(app)
+      .post("/api/v1/accounts/transfer")
+      .send({ from_id: ids[0], to_id: ids[1], amount: 100 });
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("ACCOUNT_NOT_FOUND");
   });
 });
 

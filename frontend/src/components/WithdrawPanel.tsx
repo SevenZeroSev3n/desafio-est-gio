@@ -36,35 +36,39 @@ export function WithdrawPanel({ account, onDone }: Props) {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="font-semibold text-slate-900">Saque</h3>
+    <form
+      onSubmit={submit}
+      id="saque"
+      className="scroll-mt-4 rounded-[20px] border border-border bg-panel p-6 shadow-panel"
+    >
+      <h3 className="font-display text-base font-bold">Saque</h3>
       {account.type === "checking" && (
-        <p className="mt-1 text-xs text-slate-400">Tarifa de R$ 1,00 por saque · cheque especial até -R$ 500,00</p>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted">
+          Tarifa de R$ 1,00 por saque · cheque especial até −R$ 500,00
+        </p>
       )}
 
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="sm:flex-1">
-          <label className="block text-sm font-medium text-slate-700">Valor (R$)</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0,00"
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {loading ? "Processando..." : "Sacar"}
-        </button>
-      </div>
+      <label className="mt-4 block text-[11.5px] font-semibold text-muted">Valor (R$)</label>
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="0,00"
+        className="mt-1.5 w-full rounded-xl border border-border px-3.5 py-3 font-display text-[15px] font-semibold outline-none focus:border-accent"
+      />
+      <button
+        type="submit"
+        disabled={loading}
+        className="mt-3 w-full rounded-xl bg-accent py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+      >
+        {loading ? "Processando..." : "Sacar"}
+      </button>
 
-      {error && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+      {error && (
+        <p className="mt-3 rounded-xl border border-neg/30 bg-neg/10 px-3 py-2 text-sm text-neg">{error}</p>
+      )}
     </form>
   );
 }

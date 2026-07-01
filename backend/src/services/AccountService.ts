@@ -33,12 +33,40 @@ export class AccountService {
   constructor(private readonly db: Database.Database) {}
 
   listAccounts(): AccountDTO[] {
-    const rows = this.db.prepare(`${SELECT_ACCOUNT} ORDER BY a.id`).all() as AccountRow[];
+    // A conta do gerente é interna: nunca aparece na listagem do cliente.
+    const rows = this.db
+      .prepare(`${SELECT_ACCOUNT} WHERE a.type != 'manager' ORDER BY a.id`)
+      .all() as AccountRow[];
     return rows.map(toDTO);
   }
 
+  /** Verdadeiro se o id aponta para a conta interna do gerente (acumuladora de tarifas). */
+  isManager(id: number): boolean {
+    const row = this.db.prepare("SELECT type FROM accounts WHERE id = ?").get(id) as
+      | { type: AccountType }
+      | undefined;
+    return row?.type === "manager";
+  }
+
   listTitulares(): Titular[] {
-    return this.db.prepare("SELECT id, nome FROM titulares ORDER BY id").all() as Titular[];
+    // O titular dono da conta interna do gerente não é um cliente: fica de fora.
+    return this.db
+      .prepare(
+        `SELECT id, nome FROM titulares
+         WHERE id NOT IN (SELECT owner_id FROM accounts WHERE type = 'manager')
+         ORDER BY id`,
+      )
+      .all() as Titular[];
+  }
+
+  /** Carteira interna do gerente: a conta que acumula as tarifas das correntes. */
+  getManagerWallet(): AccountDTO {
+    return toDTO(this.requireManager());
+  }
+
+  /** Extrato da carteira do gerente — as tarifas creditadas, mais recentes primeiro. */
+  managerHistory() {
+    return this.history(this.requireManager().id);
   }
 
   getAccount(id: number): AccountDTO {
@@ -81,6 +109,7 @@ export class AccountService {
     this.db.transaction(() => {
       this.setBalance(accountId, newBalance);
       this.recordTx(txId, accountId, "withdraw", amountCents, feeCents, newBalance);
+      this.creditManagerFee(txId, feeCents);
     })();
 
     return {
@@ -113,6 +142,7 @@ export class AccountService {
       this.setBalance(toId, newToBalance);
       this.recordTx(txId, fromId, "transfer_out", amountCents, feeCents, newFromBalance);
       this.recordTx(`${txId}-in`, toId, "transfer_in", amountCents, 0, newToBalance);
+      this.creditManagerFee(txId, feeCents);
     })();
 
     return {
@@ -159,6 +189,12 @@ export class AccountService {
     return row;
   }
 
+  private requireManager(): AccountRow {
+    const row = this.db.prepare(`${SELECT_ACCOUNT} WHERE a.type = 'manager'`).get() as AccountRow | undefined;
+    if (!row) throw new AppError("Conta do gerente não encontrada", "MANAGER_NOT_FOUND", 404);
+    return row;
+  }
+
   private requireTitular(id: number): number {
     const row = this.db.prepare("SELECT id FROM titulares WHERE id = ?").get(id) as { id: number } | undefined;
     if (!row) throw new AppError("Titular não encontrado", "OWNER_NOT_FOUND", 422);
@@ -172,6 +208,24 @@ export class AccountService {
 
   private setBalance(id: number, balanceCents: number): void {
     this.db.prepare("UPDATE accounts SET balance = ? WHERE id = ?").run(balanceCents, id);
+  }
+
+  /**
+   * Credita a tarifa de uma operação na conta interna do gerente, na mesma
+   * transação do débito. Registra uma linha (transfer_in) para o saldo do
+   * gerente seguir igual à soma do seu histórico. Tarifa zero (poupança) não
+   * gera linha. Sem conta de gerente (banco ainda não populado), é um no-op.
+   * Deve ser chamada dentro de uma transação aberta pelo chamador.
+   */
+  private creditManagerFee(sourceTxId: string, feeCents: number): void {
+    if (feeCents <= 0) return;
+    const manager = this.db.prepare("SELECT id, balance FROM accounts WHERE type = 'manager'").get() as
+      | { id: number; balance: number }
+      | undefined;
+    if (!manager) return;
+    const newBalance = manager.balance + feeCents;
+    this.setBalance(manager.id, newBalance);
+    this.recordTx(`${sourceTxId}-fee`, manager.id, "transfer_in", feeCents, 0, newBalance);
   }
 
   private recordTx(

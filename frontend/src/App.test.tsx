@@ -25,13 +25,15 @@ afterEach(cleanup);
 describe("App (smoke)", () => {
   it("renderiza a conta ativa carregada da API", async () => {
     render(<App />);
-    expect(await screen.findByText("João Silva")).toBeTruthy();
+    // O titular aparece na sidebar e no histórico — basta haver ao menos um.
+    expect((await screen.findAllByText("João Silva")).length).toBeGreaterThan(0);
   });
 
   it("abre o modal ao clicar em + Nova conta", async () => {
     render(<App />);
-    await screen.findByText("João Silva"); // espera o carregamento inicial
-    fireEvent.click(screen.getByText("+ Nova conta"));
+    await screen.findAllByText("João Silva"); // espera o carregamento inicial
+    // "+ Nova conta" existe no header e na sidebar; clica no primeiro.
+    fireEvent.click(screen.getAllByText("+ Nova conta")[0]);
     expect(await screen.findByText("Nova conta")).toBeTruthy();
   });
 });
