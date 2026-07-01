@@ -24,7 +24,7 @@ export function HistoryPanel({ ownerName, txs }: Props) {
         <span className="text-xs text-muted">{ownerName}</span>
       </div>
 
-      <div className="mt-3 max-h-80 overflow-y-auto">
+      <div className="mt-3 max-h-80 overflow-y-auto overflow-x-hidden">
         {txs === null && <p className="py-2 text-sm text-muted">Carregando...</p>}
         {txs?.length === 0 && <p className="py-2 text-sm text-muted">Nenhuma transação ainda.</p>}
         <ul>

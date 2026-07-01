@@ -6,9 +6,6 @@ interface Props {
   activeAccountId: number | null;
   onSelect: (id: number) => void;
   txs: Transaction[] | null;
-  onSacar: () => void;
-  onTransferir: () => void;
-  onExtrato: () => void;
 }
 
 /** Estilo do valor de uma transação: entrada (verde) vs saída (vermelho). */
@@ -22,15 +19,7 @@ function rowTone(type: Transaction["type"]) {
  * Tela "Contas": lista as contas do cliente ativo (esquerda) e o detalhe da
  * conta selecionada (direita), com movimentações recentes. Só exibe dados reais.
  */
-export function ContasScreen({
-  accounts,
-  activeAccountId,
-  onSelect,
-  txs,
-  onSacar,
-  onTransferir,
-  onExtrato,
-}: Props) {
+export function ContasScreen({ accounts, activeAccountId, onSelect, txs }: Props) {
   const active = accounts.find((a) => a.id === activeAccountId) ?? accounts[0] ?? null;
 
   if (!active) {
@@ -96,30 +85,6 @@ export function ContasScreen({
         >
           {formatBRL(active.balance)}
         </p>
-
-        <div className="mt-6 flex flex-wrap gap-2.5">
-          <button
-            type="button"
-            onClick={onTransferir}
-            className="rounded-xl bg-gradient-to-br from-accent to-accent2 px-4 py-2.5 text-[13px] font-semibold text-white transition hover:brightness-110"
-          >
-            Transferir
-          </button>
-          <button
-            type="button"
-            onClick={onSacar}
-            className="rounded-xl border border-border bg-panel2 px-4 py-2.5 text-[13px] font-semibold transition hover:border-accent"
-          >
-            Sacar
-          </button>
-          <button
-            type="button"
-            onClick={onExtrato}
-            className="rounded-xl border border-border bg-panel2 px-4 py-2.5 text-[13px] font-semibold transition hover:border-accent"
-          >
-            Extrato
-          </button>
-        </div>
 
         <div className="mt-6 border-t border-border pt-5">
           <div className="mb-2.5 font-display text-[13.5px] font-bold">Movimentações recentes</div>
