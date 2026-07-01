@@ -5,14 +5,28 @@ Aplicação fullstack de um banco com duas contas (corrente e poupança). O **ba
 
 ## Stack
 
-- **Backend:** TypeScript + Node.js (Express) · SQLite via `better-sqlite3` · validação com Zod
-- **Frontend:** React + Vite + TypeScript · Tailwind CSS
+- **Backend:** TypeScript 5.5 sobre Node.js (Express 4.21) · SQLite via `better-sqlite3` 11 ·
+  validação com Zod 3.23.
+- **Frontend:** React 18.3 + Vite 5.3 + TypeScript 5.5 · Tailwind CSS 3.4.
 
 ## Pré-requisitos
 
-- **Node.js 18+** e **npm 9+** (testado em Node 18.19).
+- **Node.js 18 ou 20 (LTS)** e **npm 9+** — baixe em [nodejs.org](https://nodejs.org) (o instalador
+  já inclui o npm). Funciona igual em Linux, Windows e macOS, desde que seja uma LTS.
+  Desenvolvido e testado em WSL (Ubuntu), Node 18.19.
+  Evite Node 22+: `better-sqlite3` (dependência nativa) pode não ter binário pré-compilado para
+  versões muito recentes em todas as plataformas, forçando compilação local (exige Python + build
+  tools) — prefira uma LTS pra não precisar disso.
+- **Git**, para clonar o repositório.
 
-Cada parte tem seu próprio `package.json` — rode `npm install` nas duas pastas.
+Cada parte tem seu próprio `package.json` — rode `npm install` nas duas pastas (comandos abaixo
+são os mesmos em qualquer terminal: Bash/Zsh no Linux/macOS, PowerShell/CMD no Windows).
+
+> **Windows + PowerShell:** se `npm` der o erro "a execução de scripts foi desabilitada neste
+> sistema", rode uma vez (não precisa ser administrador) e tente de novo:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
 
 ## Como executar
 
@@ -46,6 +60,21 @@ npm run dev
 ```
 
 Acesse **http://localhost:5173**. O Vite faz proxy de `/api` para o backend, então não há CORS a configurar.
+
+### 3. Usando os dois juntos
+
+Com backend (porta 3001) e frontend (porta 5173) rodando, no navegador:
+
+1. A tela **Início** já abre com o primeiro cliente (João Silva) e sua conta corrente selecionados —
+   os dados vêm do seed automático (tabela abaixo).
+2. Troque de conta no seletor do topo (Corrente ↔ Poupança) ou de cliente pela barra lateral.
+3. Faça um **Saque** ou uma **Transferência** no painel à direita — o saldo, o extrato e (se for
+   conta corrente) a tarifa de R$ 1,00 atualizam na hora.
+4. Aba **Histórico**: extrato completo da conta ativa, com filtro Entradas/Saídas.
+5. Aba **Carteira do gerente**: soma das tarifas de R$ 1,00 cobradas em todas as contas corrente.
+
+Se a tela mostrar "Não foi possível carregar as contas", o backend não está rodando na porta 3001 —
+confira o terminal do passo 1.
 
 ## Contas de exemplo (criadas no seed)
 
@@ -111,11 +140,15 @@ frontend usa React Testing Library). Rode em cada pasta após o `npm install`:
 
 ```bash
 # Backend — regras R1/R2 do AccountService + testes de rota (banco SQLite :memory: isolado)
-cd backend && npm test
+cd backend
+npm test
 
 # Frontend — smoke da UI com a API mockada
-cd frontend && npm test
+cd frontend
+npm test
 ```
+
+(Comandos em linhas separadas de propósito — `&&` não funciona no PowerShell 5.1 padrão do Windows.)
 
 Os mesmos comandos rodam no CI (GitHub Actions) em cada Pull Request para `main`, na matriz
 Node 18 e 20 — ver `.github/workflows/ci.yml`.
@@ -125,8 +158,9 @@ Node 18 e 20 — ver `.github/workflows/ci.yml`.
 ```
 backend/
   src/
-    services/AccountService.ts  # regras de negócio (saque, transferência, criação, carteira) — sem Express
-    services/accountPolicy.ts   # comportamento por tipo de conta (tarifa/limite); inclui a policy do gerente
+    services/AccountService.ts    # regras de negócio (saque, transferência, criação, carteira) — sem Express, sem SQL direto
+    services/AccountRepository.ts # acesso ao SQLite (SELECT/INSERT/UPDATE) — sem regra de negócio
+    services/accountPolicy.ts     # comportamento por tipo de conta (tarifa/limite); inclui a policy do gerente
     routes/{accounts,titulares,manager}.ts  # rotas HTTP (factories) + validação Zod
     validators/schemas.ts
     db/{database,schema,seed}.ts # schema idempotente + seed automático (inclui a conta do gerente)
@@ -135,11 +169,14 @@ backend/
 frontend/
   src/
     components/                 # Sidebar, BalanceHero, Sparkline, WithdrawPanel, TransferPanel,
-                                # HistoryPanel, ContasScreen, HistoricoScreen, ManagerWallet, NewAccountModal, PixelField
+                                # HistoryPanel, ContasScreen, HistoricoScreen, ManagerWallet, NewAccountModal,
+                                # TxRow, PixelField
+    hooks/                       # useAccountsData, useSelection, useAccountHistory — estado/efeitos que o App.tsx compõe
     api/bankApi.ts              # cliente HTTP tipado
-    format.ts lib/history.ts    # formatação (BRL/datas) e derivação do histórico (sparkline/totais)
+    format.ts lib/history.ts lib/txStyle.ts  # formatação (BRL/datas) e derivação de exibição (sparkline/totais/estilo de linha)
     App.tsx App.test.tsx main.tsx
 ```
 
-Toda a regra de negócio fica isolada em `AccountService` (classe pura, sem dependência de HTTP);
-as rotas só validam a entrada, chamam o service e formatam a resposta.
+A regra de negócio fica isolada em `AccountService` (classe pura, sem dependência de HTTP nem SQL
+direto — persistência é responsabilidade de `AccountRepository`); as rotas só validam a entrada,
+chamam o service e formatam a resposta.

@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { bankApi } from "./api/bankApi";
+import { useState } from "react";
 import { Sidebar, type View } from "./components/Sidebar";
 import { BalanceHero } from "./components/BalanceHero";
 import { WithdrawPanel } from "./components/WithdrawPanel";
@@ -11,87 +10,34 @@ import { NewAccountModal } from "./components/NewAccountModal";
 import { ManagerWallet } from "./components/ManagerWallet";
 import { PixelField } from "./components/PixelField";
 import { accountTypeLabel, formatBRL } from "./format";
-import type { Account, Titular, Transaction } from "./types";
+import { useAccountsData } from "./hooks/useAccountsData";
+import { useSelection } from "./hooks/useSelection";
+import { useAccountHistory } from "./hooks/useAccountHistory";
+import type { Account } from "./types";
 
 export default function App() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [titulares, setTitulares] = useState<Titular[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [activeAccountId, setActiveAccountId] = useState<number | null>(null);
-  const [txs, setTxs] = useState<Transaction[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { accounts, titulares, loadError, refresh } = useAccountsData();
+  const {
+    clients,
+    selectedClient,
+    clientAccounts,
+    activeAccount,
+    activeId,
+    selectClient,
+    selectAccount,
+    setSelectedClientId,
+    setActiveAccountId,
+  } = useSelection(accounts);
+  const { txs, refetch: refetchHistory } = useAccountHistory(activeId);
+
   const [toast, setToast] = useState<string | null>(null);
   const [showNewAccount, setShowNewAccount] = useState(false);
   const [view, setView] = useState<View>("inicio");
-  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
-
-  const refresh = useCallback(async () => {
-    try {
-      const [list, owners] = await Promise.all([bankApi.listAccounts(), bankApi.listTitulares()]);
-      setAccounts(list);
-      setTitulares(owners);
-      setLoadError(null);
-    } catch {
-      setLoadError("Não foi possível carregar as contas. O backend está rodando na porta 3001?");
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  // Clientes = Titulares com contas visíveis, na ordem em que aparecem.
-  const clients = useMemo(() => {
-    const seen: Account["owner"][] = [];
-    for (const a of accounts) if (!seen.some((o) => o.id === a.owner.id)) seen.push(a.owner);
-    return seen;
-  }, [accounts]);
-
-  // Cliente em foco e suas contas. Derivado com fallback (primeiro cliente / primeira
-  // conta) para dispensar efeitos de sincronização de seleção.
-  const selectedClient = clients.find((c) => c.id === selectedClientId) ?? clients[0] ?? null;
-  const clientAccounts = accounts.filter((a) => a.owner.id === selectedClient?.id);
-  const activeAccount =
-    clientAccounts.find((a) => a.id === activeAccountId) ?? clientAccounts[0] ?? null;
-  const activeId = activeAccount?.id ?? null;
-
-  // Histórico da conta ativa. Reroda ao trocar de conta ou após uma operação.
-  const lastAccountIdRef = useRef(activeId);
-  useEffect(() => {
-    const isSwitch = lastAccountIdRef.current !== activeId;
-    lastAccountIdRef.current = activeId;
-    if (activeId === null) {
-      setTxs(null);
-      return;
-    }
-    let active = true;
-    if (isSwitch) setTxs(null);
-    bankApi
-      .history(activeId)
-      .then((data) => active && setTxs(data))
-      .catch(() => {
-        if (active && isSwitch) setTxs([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, [activeId, historyRefreshKey]);
-
-  function selectClient(clientId: number) {
-    setSelectedClientId(clientId);
-    setActiveAccountId(accounts.find((a) => a.owner.id === clientId)?.id ?? null);
-  }
-
-  function selectAccount(accountId: number) {
-    setActiveAccountId(accountId);
-    const acc = accounts.find((a) => a.id === accountId);
-    if (acc) setSelectedClientId(acc.owner.id);
-  }
 
   function handleDone(message: string) {
     setToast(message);
     refresh();
-    setHistoryRefreshKey((k) => k + 1);
+    refetchHistory();
     window.setTimeout(() => setToast(null), 6000);
   }
 

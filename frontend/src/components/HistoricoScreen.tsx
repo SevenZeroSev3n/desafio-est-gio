@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Account, Transaction } from "../types";
-import { formatBRL, formatDate, txLabel } from "../format";
+import { isEntrada } from "../lib/txStyle";
+import { TxRow } from "./TxRow";
 
 interface Props {
   account: Account;
@@ -15,10 +16,6 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "out", label: "Saídas" },
 ];
 
-function isEntrada(t: Transaction) {
-  return t.type === "transfer_in";
-}
-
 /** Rótulo de dia (pt-BR) a partir do created_at UTC do backend. */
 function dayLabel(iso: string) {
   return new Date(iso.replace(" ", "T") + "Z").toLocaleDateString("pt-BR");
@@ -32,7 +29,7 @@ export function HistoricoScreen({ account, txs }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
 
   const filtered = (txs ?? []).filter((t) =>
-    filter === "in" ? isEntrada(t) : filter === "out" ? !isEntrada(t) : true,
+    filter === "in" ? isEntrada(t.type) : filter === "out" ? !isEntrada(t.type) : true,
   );
 
   // Agrupa por dia preservando a ordem (o backend já devolve mais recente primeiro).
@@ -82,36 +79,9 @@ export function HistoricoScreen({ account, txs }: Props) {
               {g.day}
             </div>
             <ul>
-              {g.items.map((t) => {
-                const entrada = isEntrada(t);
-                const tone = entrada ? "text-pos" : "text-neg";
-                const chip = entrada ? "bg-pos/15 text-pos" : "bg-neg/15 text-neg";
-                return (
-                  <li
-                    key={t.id}
-                    className="-mx-2 flex items-center justify-between rounded-xl px-2 py-3 transition hover:bg-panel2"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-9 w-9 items-center justify-center rounded-[11px] font-display text-base font-bold ${chip}`}
-                      >
-                        {entrada ? "↓" : "↑"}
-                      </div>
-                      <div>
-                        <p className="text-[13.5px] font-semibold">{txLabel(t.type)}</p>
-                        <p className="text-[11.5px] text-muted">{formatDate(t.created_at)}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-display text-sm font-semibold ${tone}`}>
-                        {entrada ? "+" : "−"} {formatBRL(t.amount)}
-                      </p>
-                      {t.fee > 0 && <p className="text-[11px] text-muted">tarifa {formatBRL(t.fee)}</p>}
-                      <p className="text-[11px] text-muted">saldo {formatBRL(t.balance_after)}</p>
-                    </div>
-                  </li>
-                );
-              })}
+              {g.items.map((t) => (
+                <TxRow key={t.id} tx={t} variant="full" />
+              ))}
             </ul>
           </div>
         ))}
