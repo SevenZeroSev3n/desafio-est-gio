@@ -82,7 +82,7 @@ export function ManagerWallet() {
 
       <section className="rounded-[20px] border border-border bg-panel p-6 shadow-panel">
         <h3 className="font-display text-base font-bold">Tarifas recebidas</h3>
-        <div className="mt-3 max-h-96 overflow-y-auto">
+        <div className="mt-3 max-h-96 overflow-y-auto overflow-x-hidden">
           {txs === null && <p className="py-2 text-sm text-muted">Carregando...</p>}
           {txs?.length === 0 && <p className="py-2 text-sm text-muted">Nenhuma tarifa ainda.</p>}
           <ul>

@@ -183,9 +183,6 @@ export default function App() {
             activeAccountId={activeId}
             onSelect={selectAccount}
             txs={txs}
-            onSacar={() => setView("inicio")}
-            onTransferir={() => setView("inicio")}
-            onExtrato={() => setView("historico")}
           />
         ) : view === "historico" ? (
           activeAccount ? (
