@@ -1,18 +1,12 @@
 import type { Account, Transaction } from "../types";
-import { accountTypeLabel, formatBRL, formatDate, txLabel } from "../format";
+import { accountTypeLabel, formatBRL } from "../format";
+import { TxRow } from "./TxRow";
 
 interface Props {
   accounts: Account[];
   activeAccountId: number | null;
   onSelect: (id: number) => void;
   txs: Transaction[] | null;
-}
-
-/** Estilo do valor de uma transação: entrada (verde) vs saída (vermelho). */
-function rowTone(type: Transaction["type"]) {
-  return type === "transfer_in"
-    ? { sign: "+", glyph: "↓", tone: "text-pos", chip: "bg-pos/15 text-pos" }
-    : { sign: "−", glyph: "↑", tone: "text-neg", chip: "bg-neg/15 text-neg" };
 }
 
 /**
@@ -91,27 +85,9 @@ export function ContasScreen({ accounts, activeAccountId, onSelect, txs }: Props
           {txs === null && <p className="py-2 text-sm text-muted">Carregando...</p>}
           {txs?.length === 0 && <p className="py-2 text-sm text-muted">Nenhuma movimentação ainda.</p>}
           <ul>
-            {txs?.slice(0, 5).map((t) => {
-              const s = rowTone(t.type);
-              return (
-                <li key={t.id} className="flex items-center justify-between border-b border-border py-2.5">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-[9px] font-display text-[13px] font-bold ${s.chip}`}
-                    >
-                      {s.glyph}
-                    </div>
-                    <div>
-                      <p className="text-[12.5px] font-semibold">{txLabel(t.type)}</p>
-                      <p className="text-[11px] text-muted">{formatDate(t.created_at)}</p>
-                    </div>
-                  </div>
-                  <span className={`font-display text-[12.5px] font-semibold ${s.tone}`}>
-                    {s.sign} {formatBRL(t.amount)}
-                  </span>
-                </li>
-              );
-            })}
+            {txs?.slice(0, 5).map((t) => (
+              <TxRow key={t.id} tx={t} variant="compact" />
+            ))}
           </ul>
         </div>
       </div>

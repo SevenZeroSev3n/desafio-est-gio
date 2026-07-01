@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { bankApi, ApiRequestError } from "../api/bankApi";
-import { formatBRL, formatDate } from "../format";
+import { formatBRL } from "../format";
 import type { Account, Transaction } from "../types";
+import { TxRow } from "./TxRow";
 
 /**
  * Carteira interna do gerente: o saldo acumulado das tarifas cobradas nas contas
@@ -87,24 +88,7 @@ export function ManagerWallet() {
           {txs?.length === 0 && <p className="py-2 text-sm text-muted">Nenhuma tarifa ainda.</p>}
           <ul>
             {txs?.map((t) => (
-              <li
-                key={t.id}
-                className="-mx-2 flex items-center justify-between rounded-xl px-2 py-3 transition hover:bg-panel2"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-pos/15 font-display text-base font-bold text-pos">
-                    ↓
-                  </div>
-                  <div>
-                    <p className="text-[13.5px] font-semibold">Tarifa de operação</p>
-                    <p className="text-[11.5px] text-muted">{formatDate(t.created_at)}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-display text-sm font-semibold text-pos">+ {formatBRL(t.amount)}</p>
-                  <p className="text-[11px] text-muted">saldo {formatBRL(t.balance_after)}</p>
-                </div>
-              </li>
+              <TxRow key={t.id} tx={t} variant="full" label="Tarifa de operação" />
             ))}
           </ul>
         </div>
