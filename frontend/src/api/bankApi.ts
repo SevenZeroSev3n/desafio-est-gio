@@ -57,4 +57,10 @@ export const bankApi = {
     ),
 
   history: (id: number) => request<Transaction[]>(`/accounts/${id}/history`),
+
+  /** Carteira interna do gerente: saldo acumulado de tarifas. */
+  getManagerWallet: () => request<Account>("/manager"),
+
+  /** Extrato da carteira do gerente (as tarifas creditadas). */
+  managerHistory: () => request<Transaction[]>("/manager/history"),
 };

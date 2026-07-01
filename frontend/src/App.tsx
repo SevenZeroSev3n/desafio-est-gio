@@ -6,8 +6,12 @@ import { WithdrawPanel } from "./components/WithdrawPanel";
 import { TransferPanel } from "./components/TransferPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { NewAccountModal } from "./components/NewAccountModal";
+import { ManagerWallet } from "./components/ManagerWallet";
 import { PixelField } from "./components/PixelField";
 import type { Account, Titular, Transaction } from "./types";
+
+/** Abas de topo: o painel do cliente ou a carteira interna do gerente. */
+type View = "painel" | "carteira";
 
 export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -17,6 +21,7 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showNewAccount, setShowNewAccount] = useState(false);
+  const [view, setView] = useState<View>("painel");
   // Incrementado a cada operação concluída (saque/transferência/nova conta) para
   // reexecutar o fetch de histórico abaixo sem trocar de conta ativa.
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
@@ -94,8 +99,13 @@ export default function App() {
         <Sidebar
           accounts={accounts}
           activeAccountId={activeAccountId}
-          onSelect={setActiveAccountId}
+          onSelect={(id) => {
+            setActiveAccountId(id);
+            setView("painel");
+          }}
           onNewAccount={() => setShowNewAccount(true)}
+          view={view}
+          onNavigate={setView}
         />
       ) : (
         <aside className="flex w-full items-center gap-3 border-border bg-panel p-5 md:w-[236px] md:flex-none md:border-r">
@@ -107,15 +117,21 @@ export default function App() {
       <main className="min-w-0 flex-1 px-5 py-7 md:px-8">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-[13px] text-muted">Painel</div>
-            <h1 className="font-display text-2xl font-bold leading-tight">Banco Agilize</h1>
+            <div className="text-[13px] text-muted">
+              {view === "carteira" ? "Acesso de gerente" : "Painel"}
+            </div>
+            <h1 className="font-display text-2xl font-bold leading-tight">
+              {view === "carteira" ? "Carteira do gerente" : "Banco Agilize"}
+            </h1>
           </div>
-          <button
-            onClick={() => setShowNewAccount(true)}
-            className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
-          >
-            + Nova conta
-          </button>
+          {view === "painel" && (
+            <button
+              onClick={() => setShowNewAccount(true)}
+              className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+            >
+              + Nova conta
+            </button>
+          )}
         </header>
 
         {loadError && (
@@ -130,7 +146,9 @@ export default function App() {
           </div>
         )}
 
-        {activeAccount ? (
+        {view === "carteira" ? (
+          <ManagerWallet />
+        ) : activeAccount ? (
           <div className="grid items-start gap-5 lg:grid-cols-[1.55fr_1fr]">
             <div className="flex min-w-0 flex-col gap-5">
               <BalanceHero account={activeAccount} txs={txs} />
