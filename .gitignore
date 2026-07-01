@@ -30,5 +30,10 @@ build/
 # Config local das engineering skills (não compartilhado)
 docs/agents/
 
+# Contexto pra IA/dev — não precisa pra rodar o app
+CLAUDE.md
+CONTEXT.md
+docs/adr/
+
 # Worktrees locais do Claude Code (checkouts aninhados, não versionar)
 .claude/
