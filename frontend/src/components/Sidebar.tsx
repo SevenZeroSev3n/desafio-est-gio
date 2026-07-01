@@ -1,11 +1,15 @@
 import type { Account } from "../types";
 import { accountTypeLabel, formatBRL } from "../format";
 
+type View = "painel" | "carteira";
+
 interface Props {
   accounts: Account[];
   activeAccountId: number | null;
   onSelect: (id: number) => void;
   onNewAccount: () => void;
+  view: View;
+  onNavigate: (view: View) => void;
 }
 
 /**
@@ -13,7 +17,14 @@ interface Props {
  * torna a conta ativa (modelo single-active-account). Sem nav de páginas — não
  * há rotas — e sem usuário "logado": o app opera sobre todos os titulares.
  */
-export function Sidebar({ accounts, activeAccountId, onSelect, onNewAccount }: Props) {
+export function Sidebar({
+  accounts,
+  activeAccountId,
+  onSelect,
+  onNewAccount,
+  view,
+  onNavigate,
+}: Props) {
   // Titulares na ordem em que aparecem (a lista já vem ordenada por id da conta).
   const owners: Account["owner"][] = [];
   for (const a of accounts) {
@@ -32,6 +43,31 @@ export function Sidebar({ accounts, activeAccountId, onSelect, onNewAccount }: P
         </div>
       </div>
 
+      <div className="flex flex-col gap-1">
+        <button
+          type="button"
+          aria-current={view === "painel" ? "true" : undefined}
+          onClick={() => onNavigate("painel")}
+          className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-medium transition ${
+            view === "painel" ? "bg-chip text-accent" : "text-muted hover:bg-panel2 hover:text-text"
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-sm ${view === "painel" ? "bg-accent" : "bg-current opacity-50"}`} />
+          Painel
+        </button>
+        <button
+          type="button"
+          aria-current={view === "carteira" ? "true" : undefined}
+          onClick={() => onNavigate("carteira")}
+          className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-medium transition ${
+            view === "carteira" ? "bg-chip text-accent" : "text-muted hover:bg-panel2 hover:text-text"
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-sm ${view === "carteira" ? "bg-accent" : "bg-current opacity-50"}`} />
+          Carteira do gerente
+        </button>
+      </div>
+
       <nav className="flex flex-col gap-5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
           Titulares
@@ -42,7 +78,7 @@ export function Sidebar({ accounts, activeAccountId, onSelect, onNewAccount }: P
             {accounts
               .filter((a) => a.owner.id === owner.id)
               .map((a) => {
-                const active = a.id === activeAccountId;
+                const active = a.id === activeAccountId && view === "painel";
                 return (
                   <button
                     key={a.id}

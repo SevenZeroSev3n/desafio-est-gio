@@ -7,7 +7,14 @@ export function formatBRL(value: number): string {
 }
 
 export function accountTypeLabel(type: AccountType): string {
-  return type === "checking" ? "Conta Corrente" : "Conta Poupança";
+  switch (type) {
+    case "checking":
+      return "Conta Corrente";
+    case "savings":
+      return "Conta Poupança";
+    case "manager":
+      return "Carteira do gerente";
+  }
 }
 
 export function txLabel(type: Transaction["type"]): string {
