@@ -2,7 +2,6 @@
 
 Aplicação fullstack de um banco com duas contas (corrente e poupança). O **backend** expõe uma API HTTP com toda a regra de negócio; o **frontend** consome essa API para sacar, transferir e ver o histórico. As tarifas cobradas nas contas corrente são acumuladas numa **carteira interna do gerente**, visível numa aba própria da UI.
 
-> Especificação original do desafio em [`ESPECIFICACAO.pdf`](./ESPECIFICACAO.pdf).
 
 ## Stack
 
@@ -71,7 +70,7 @@ inicial R$ 0,00) que acumula as tarifas. Ela é invisível para o cliente — **
 | Saldo negativo | Permitido até **-R$ 500,00** (cheque especial); `valor + tarifa` não pode ultrapassar o limite | **Não permitido** |
 
 Na **transferência**, a conta de origem segue as regras do seu próprio tipo (tarifa/limite); o destino
-recebe o valor integral. Débito e crédito acontecem numa transação atômica do SQLite.
+recebe o valor integral. Débito e crédito acontecem numa transação do SQLite.
 
 Cada tarifa de R$ 1,00 cobrada numa corrente é **creditada na carteira do gerente** na mesma transação
 do débito — o saldo da carteira é sempre igual à soma das tarifas coletadas. A poupança não gera tarifa
@@ -98,26 +97,7 @@ Base: `http://localhost:3001/api/v1`
 ### Exemplos
 
 ```bash
-# Saque de R$ 100 na conta 1 (corrente): cobra R$ 1 de tarifa
-curl -X POST http://localhost:3001/api/v1/accounts/1/withdraw \
-  -H 'Content-Type: application/json' -d '{"amount":100}'
-
-# Transferência de R$ 50 da conta 1 para a 3
-curl -X POST http://localhost:3001/api/v1/accounts/transfer \
-  -H 'Content-Type: application/json' -d '{"from_id":1,"to_id":3,"amount":50}'
-
-# Cria uma poupança para o titular existente João Silva (owner_id 1)
-curl -X POST http://localhost:3001/api/v1/accounts \
-  -H 'Content-Type: application/json' -d '{"type":"savings","balance":0,"owner_id":1}'
-
-# Cria uma conta para um titular novo
-curl -X POST http://localhost:3001/api/v1/accounts \
-  -H 'Content-Type: application/json' -d '{"type":"checking","balance":100,"owner_name":"Ana Lima"}'
-
-# Consulta a carteira do gerente (saldo de tarifas acumulado após os saques acima)
-curl http://localhost:3001/api/v1/manager
-```
-
+# Saque
 Erros de validação de shape retornam **HTTP 400** (`VALIDATION_ERROR`); erros de regra de negócio
 retornam **HTTP 422** com `{ "error", "code", ... }` — ex.: `INSUFFICIENT_FUNDS` (estouro do cheque
 especial), `SAVINGS_NEGATIVE_BALANCE` (poupança ficaria negativa) e `NEGATIVE_INITIAL_BALANCE`.
