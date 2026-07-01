@@ -29,3 +29,6 @@ build/
 
 # Config local das engineering skills (não compartilhado)
 docs/agents/
+
+# Worktrees locais do Claude Code (checkouts aninhados, não versionar)
+.claude/
